@@ -38,7 +38,7 @@ func main() {
 		log.Fatal("Please, provide a TAILNET_NAME option")
 	}
 
-	apiUrl := fmt.Sprintf("https://api.tailscale.com/api/v2/tailnet/%s/devices", *tailnetName)
+	apiUrl := fmt.Sprintf("https://api.tailscale.com/api/v2/tailnet/%s/devices", tailnetName)
 	_ = genAPIAccessToken(apiUrl)
 
 	s := new(tsnet.Server)
