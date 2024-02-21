@@ -2,18 +2,13 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"flag"
 	"fmt"
-	"io"
 	"log"
-	"net/http"
 	"os"
-	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-
-	"golang.org/x/oauth2/clientcredentials"
+	"github.com/tailscale/tailscale-client-go/tailscale"
 )
 
 var (
@@ -63,72 +58,79 @@ func main() {
 		log.Fatal("Please, provide a TAILNET_NAME option")
 	}
 
-	var oauthConfig = &clientcredentials.Config{
-		ClientID:     os.Getenv("OAUTH_CLIENT_ID"),
-		ClientSecret: os.Getenv("OAUTH_CLIENT_SECRET"),
-		TokenURL:     "https://api.tailscale.com/api/v2/oauth/token",
+	client, err := tailscale.NewClient(
+		"",
+		tailnetName,
+		tailscale.WithOAuthClientCredentials(clientId, clientSecret, nil),
+	)
+	if err != nil {
+		log.Fatalf("error: %s", err)
 	}
-	client := oauthConfig.Client(context.Background())
+
+	// List all your devices
+	devices, err := client.Devices(context.Background())
+	fmt.Printf("# of devices: %d", len(devices))
 
 	/*
-			apiUrl := fmt.Sprintf("https://api.tailscale.com/api/v2/tailnet/%s/devices", tailnetName)
-			resp, err := client.Get(apiUrl)
-			if err != nil {
-				log.Fatalf("error getting keys: %v", err)
-			}
-		  defer resp.Body.Close()
-
-			body, err := io.ReadAll(resp.Body)
-			if err != nil {
-				log.Fatalf("error reading response body: %v", err)
-			}
-
-			fmt.Printf("%s", body)
+		var oauthConfig = &clientcredentials.Config{
+			ClientID:     os.Getenv("OAUTH_CLIENT_ID"),
+			ClientSecret: os.Getenv("OAUTH_CLIENT_SECRET"),
+			TokenURL:     "https://api.tailscale.com/api/v2/oauth/token",
+		}
+		client := oauthConfig.Client(context.Background())
 	*/
 
-	now := time.Now()
-	tFormat := "2006-01-02T15:04:05.000000000Z"
-	start := now.Add(-5 * time.Minute).Format(tFormat)
-	end := now.Format(tFormat)
-	apiUrl := fmt.Sprintf("https://api.tailscale.com/api/v2/tailnet/%s/network-logs?start=%s&end=%s", tailnetName, start, end)
-	resp, err := client.Get(apiUrl)
-	if err != nil {
-		log.Fatalf("error get : %s %v", apiUrl, err)
-	}
-	defer resp.Body.Close()
+	/*
+		apiUrl := fmt.Sprintf("https://api.tailscale.com/api/v2/tailnet/%s/devices", tailnetName)
+		resp, err := client.Get(apiUrl)
+		if err != nil {
+			log.Fatalf("error getting keys: %v", err)
+		}
+		defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		log.Fatalf("Unexpected status code: %d", resp.StatusCode)
-	}
-
-	// Read the response body
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		log.Fatalf("Failed to read response body: %v", err)
-	}
-
-	// Unmarshal the JSON data into the struct
-	var apiResponse APILogResponse
-	err = json.Unmarshal(body, &apiResponse)
-	if err != nil {
-		log.Fatalf("Failed to unmarshal JSON response: %v", err)
-	}
-
-	// Pretty print the JSON response
-	prettyJSON, err := json.MarshalIndent(apiResponse, "", "    ") // Use 4 spaces for indentation
-	if err != nil {
-		log.Fatalf("Failed to generate pretty JSON: %v", err)
-	}
-
-	fmt.Printf("Pretty Printed API Response:\n%s\n", string(prettyJSON))
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			log.Fatalf("error reading response body: %v", err)
+		}
+		fmt.Printf("%s", body)
+	*/
 
 	/*
+		now := time.Now()
+		tFormat := "2006-01-02T15:04:05.000000000Z"
+		start := now.Add(-5 * time.Minute).Format(tFormat)
+		end := now.Format(tFormat)
+		apiUrl := fmt.Sprintf("https://api.tailscale.com/api/v2/tailnet/%s/network-logs?start=%s&end=%s", tailnetName, start, end)
+		resp, err := client.Get(apiUrl)
+		if err != nil {
+			log.Fatalf("error get : %s %v", apiUrl, err)
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			log.Fatalf("Unexpected status code: %d", resp.StatusCode)
+		}
+
+		// Read the response body
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			log.Fatalf("Failed to read response body: %v", err)
+		}
+
+		// Unmarshal the JSON data into the struct
 		var apiResponse APILogResponse
 		err = json.Unmarshal(body, &apiResponse)
 		if err != nil {
-			log.Fatal(err)
+			log.Fatalf("Failed to unmarshal JSON response: %v", err)
 		}
-		fmt.Printf("num of messages: %d\n", len(apiResponse.Logs))
+
+		// Pretty print the JSON response
+		prettyJSON, err := json.MarshalIndent(apiResponse, "", "    ") // Use 4 spaces for indentation
+		if err != nil {
+			log.Fatalf("Failed to generate pretty JSON: %v", err)
+		}
+
+		fmt.Printf("Pretty Printed API Response:\n%s\n", string(prettyJSON))
 	*/
 
 	/*

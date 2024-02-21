@@ -1,48 +1,8 @@
 package main
 
 import (
-	"encoding/json"
-	"fmt"
-	"io"
-	"net/http"
 	"time"
 )
-
-type APILogConfig struct {
-	Token     string
-	TailnetId string
-}
-
-const tFormat = "2006-01-02T15:04:05.000000000Z"
-
-func (a *APILogConfig) makeRequest(start, end time.Time) (*APILogResponse, error) {
-	sT := start.Format(tFormat)
-	eT := end.Format(tFormat)
-	url := fmt.Sprintf("https://api.taiscale.com/api/v2/tailnet/%s/network-logs?start=%s&end=%s", a.TailnetId, sT, eT)
-
-	resp, err := http.Get(url)
-	if err != nil {
-		return nil, fmt.Errorf("error making api log request: %s", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("api log: returned status code: %d", resp.StatusCode)
-	}
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("api log: Failed to read response body: %v", err)
-	}
-
-	var apiResponse APILogResponse
-	err = json.Unmarshal(body, &apiResponse)
-	if err != nil {
-		return nil, fmt.Errorf("Failed to unmarshal JSON api log response: %v", err)
-	}
-
-	return &apiResponse, nil
-}
 
 type APILogResponse struct {
 	Logs []Message `json:"logs"`
