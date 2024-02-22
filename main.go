@@ -33,6 +33,23 @@ type AppConfig struct {
 	LocalClient  *tailscale.LocalClient
 }
 
+type LogEntry struct {
+	Src         string
+	Dst         string
+	TrafficType string
+	Proto       int
+}
+
+// MetricType defines the type of metric to create
+type MetricType int
+
+const (
+	CounterMetric MetricType = iota
+	GaugeMetric
+)
+
+var listOfMetrics []prometheus.Collector
+
 // TODO
 // - [] Make a request to the API to make sure it works (https://github.com/tailscale/tailscale/blob/main/api.md#list-tailnet-devices)
 //      Store data in DS1
@@ -47,16 +64,23 @@ type AppConfig struct {
 // 3. update metrics
 //
 // Metrics:
-// ts_bytes_send_per_sec_counter{hostname, proto, dst, type}
-// 3 more...
+// (data comes from the logs)
+// 1. Get data for new interval (1min)
+// 2. Iterate over entries and update DS map[src][dst][proto][trafficType] += newDP
 //
-// ts_number_hosts_gauge{os="", external=""} = num
-// ts_client_updates_gauge{hostname=""} = 0 1
-// ts_latencies_gauge{hostname, derp_server} = num
-// ts_tags_gauge{hostname} = num tags
-// ts_udp_ok_gauge{hostname} = 0 or 1
-// ts_versions{version=""} = num hosts
-// ts_client_needs_updates{hostname=""} = 0 1
+// tailscale_tx_bytes_counter{src, dst, proto, trafficType, dst}
+// tailscale_rx_bytes_counter{src, dst, proto, trafficType, dst}
+// tailscale_tx_packets_counter{src, dst, proto, trafficType, dst}
+// tailscale_rx_packets_counter{src, dst, proto, trafficType, dst}
+//
+// (data comes from the traditional api)
+// tailscale_number_hosts_gauge{os="", external=""} = num
+// tailscale_client_updates_gauge{hostname=""} = 0 1
+// tailscale_latencies_gauge{hostname, derp_server} = num
+// tailscale_tags_gauge{hostname} = num tags
+// tailscale_udp_ok_gauge{hostname} = 0 or 1
+// tailscale_versions{version=""} = num hosts
+// tailscale_client_needs_updates{hostname=""} = 0 1
 
 func main() {
 	flag.Parse()
@@ -105,11 +129,25 @@ func main() {
 		LocalClient:  lc,
 	}
 
-	app.getFromAPI()
-	app.getFromLogs()
+	// m := make(map[LogEntry]int)
+	// m[LogEntry{"foo", "bar", "virtual", 17}] = 1
+	// m[LogEntry{"foo", "bar", "virtual", 17}] += 10
+	// m[LogEntry{"foo", "zzz", "virtual", 6}] = 100
+	// for k := range m {
+	// 	v := m[k]
+	// 	fmt.Printf("%v: %d\n", k, v)
+	// }
 
-	app.createMetric()
+	//app.getFromAPI()
+	//app.getFromLogs()
 	app.addHandlers()
+
+	listOfMetrics = append(listOfMetrics,
+		createMetric(CounterMetric, "tailscale_tx_bytes_counter", "Total number of bytes transmitted"),
+		createMetric(CounterMetric, "tailscale_rx_bytes_counter", "Total number of bytes received"),
+		createMetric(CounterMetric, "tailscale_tx_packets_counter", "Total number of packets transmitted"),
+		createMetric(CounterMetric, "tailscale_rx_packets_counter", "Total number of packets received"),
+	)
 
 	if ln != nil {
 		log.Printf("starting server on %s", *addr)
@@ -129,16 +167,30 @@ func (a *AppConfig) addHandlers() {
 	})
 }
 
-func (a *AppConfig) createMetric() {
-	var aGauge = prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{
-			Name: "drio_random",
-			Help: "A drio random gauge",
-		},
-		[]string{"method"},
-	)
-	aGauge.WithLabelValues("foo").Set(123)
-	prometheus.MustRegister(aGauge)
+// createMetric creates a metric (either a counter or a gauge)
+// based on the provided type, name, and help text.
+// It returns a prometheus.Collector, which both prometheus.Counter
+// and prometheus.Gauge satisfy.
+func createMetric(metricType MetricType, name string, help string) prometheus.Collector {
+	var metric prometheus.Collector
+
+	switch metricType {
+	case CounterMetric:
+		metric = prometheus.NewCounter(prometheus.CounterOpts{
+			Name: name,
+			Help: help,
+		})
+	case GaugeMetric:
+		metric = prometheus.NewGauge(prometheus.GaugeOpts{
+			Name: name,
+			Help: help,
+		})
+	}
+
+	// Register the metric with Prometheus's default registry
+	prometheus.MustRegister(metric)
+
+	return metric
 }
 
 func (a *AppConfig) getFromAPI() {
