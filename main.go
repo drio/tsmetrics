@@ -33,14 +33,6 @@ type AppConfig struct {
 	localClient  *tailscale.LocalClient
 }
 
-type LogEntry struct {
-	src         string
-	dst         string
-	trafficType string
-	proto       int
-}
-
-// MetricType defines the type of metric to create
 type MetricType int
 
 const (
@@ -48,24 +40,6 @@ const (
 	GaugeMetric
 )
 
-// TODO
-// - [] Make a request to the API to make sure it works (https://github.com/tailscale/tailscale/blob/main/api.md#list-tailnet-devices)
-//      Store data in DS1
-// - [] Write a client that makes a request to the API to get net logs
-//      Put the data in the DS2
-// - [] Update the metrics using DS1 and DS2 (lock)
-// - [] serve metrics via prometheus
-//
-// Go Routings
-// 1. get api data
-// 2. get log data
-// 3. update metrics
-//
-// Metrics:
-// (data comes from the logs)
-// 1. Get data for new interval (1min)
-// 2. Iterate over entries and update DS map[src][dst][proto][trafficType] += newDP
-//
 // (data comes from the traditional api)
 // tailscale_number_hosts_gauge{os="", external=""} = num
 // tailscale_client_updates_gauge{hostname=""} = 0 1
@@ -121,15 +95,6 @@ func main() {
 		server:       s,
 		localClient:  lc,
 	}
-
-	// m := make(map[LogEntry]int)
-	// m[LogEntry{"foo", "bar", "virtual", 17}] = 1
-	// m[LogEntry{"foo", "bar", "virtual", 17}] += 10
-	// m[LogEntry{"foo", "zzz", "virtual", 6}] = 100
-	// for k := range m {
-	// 	v := m[k]
-	// 	fmt.Printf("%v: %d\n", k, v)
-	// }
 
 	//app.getFromAPI()
 	//app.getFromLogs()
