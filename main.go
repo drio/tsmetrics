@@ -111,10 +111,36 @@ func main() {
 	logMetrics[n] = createMetric(CounterMetric, n, "Total number of packets received")
 
 	// TODO: Every x seconds we have to get data from the api logs and update the metrics
+	chLogMetrics := make(chan bool)
+	chAPIMetrics := make(chan bool)
+	go updateLogMetrics(chLogMetrics)
+	go updateAPIMetrics(chAPIMetrics)
 
 	if ln != nil {
 		log.Printf("starting server on %s", *addr)
 		log.Fatal(http.Serve(ln, nil))
+	}
+
+	fmt.Printf("starting loop...\n")
+	for {
+		chLogMetrics <- true
+		time.Sleep(1 * time.Second)
+		chAPIMetrics <- true
+		time.Sleep(2 * time.Second)
+	}
+}
+
+func updateLogMetrics(ch chan bool) {
+	fmt.Printf("starting updateLog GR...\n")
+	for range ch {
+		fmt.Printf("updateLogMetrics: New data\n ")
+	}
+}
+
+func updateAPIMetrics(ch chan bool) {
+	fmt.Printf("starting updateAPI GR...\n")
+	for range ch {
+		fmt.Printf("updateAPIMetrics: New data\n ")
 	}
 }
 
