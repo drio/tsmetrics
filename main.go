@@ -48,8 +48,6 @@ const (
 	GaugeMetric
 )
 
-var listOfMetrics []prometheus.Collector
-
 // TODO
 // - [] Make a request to the API to make sure it works (https://github.com/tailscale/tailscale/blob/main/api.md#list-tailnet-devices)
 //      Store data in DS1
@@ -67,11 +65,6 @@ var listOfMetrics []prometheus.Collector
 // (data comes from the logs)
 // 1. Get data for new interval (1min)
 // 2. Iterate over entries and update DS map[src][dst][proto][trafficType] += newDP
-//
-// tailscale_tx_bytes_counter{src, dst, proto, trafficType, dst}
-// tailscale_rx_bytes_counter{src, dst, proto, trafficType, dst}
-// tailscale_tx_packets_counter{src, dst, proto, trafficType, dst}
-// tailscale_rx_packets_counter{src, dst, proto, trafficType, dst}
 //
 // (data comes from the traditional api)
 // tailscale_number_hosts_gauge{os="", external=""} = num
@@ -142,12 +135,15 @@ func main() {
 	//app.getFromLogs()
 	app.addHandlers()
 
-	listOfMetrics = append(listOfMetrics,
-		createMetric(CounterMetric, "tailscale_tx_bytes_counter", "Total number of bytes transmitted"),
-		createMetric(CounterMetric, "tailscale_rx_bytes_counter", "Total number of bytes received"),
-		createMetric(CounterMetric, "tailscale_tx_packets_counter", "Total number of packets transmitted"),
-		createMetric(CounterMetric, "tailscale_rx_packets_counter", "Total number of packets received"),
-	)
+	logMetrics := map[string]prometheus.Collector{}
+	n := "tailscale_tx_bytes_counter"
+	logMetrics[n] = createMetric(CounterMetric, n, "Total number of bytes transmitted")
+	n = "tailscale_rx_bytes_counter"
+	logMetrics[n] = createMetric(CounterMetric, n, "Total number of bytes received")
+	n = "tailscale_tx_packets_counter"
+	logMetrics[n] = createMetric(CounterMetric, n, "Total number of packets transmitted")
+	n = "tailscale_rx_packets_counter"
+	logMetrics[n] = createMetric(CounterMetric, n, "Total number of packets received")
 
 	if ln != nil {
 		log.Printf("starting server on %s", *addr)
@@ -163,6 +159,7 @@ func (a *AppConfig) addHandlers() {
 		if err != nil {
 			http.Error(w, fmt.Sprintf("Error : %v", err), http.StatusInternalServerError)
 		}
+
 		fmt.Fprintf(w, "hello: %s", who.Node.Name)
 	})
 }
