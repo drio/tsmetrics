@@ -36,7 +36,7 @@ func (m *MetricData) Init() {
 }
 
 // Update based on the data from a new log entry (counts)
-func (m *MetricData) Update(cc *ConnectionCounts, tt TrafficType, proto uint8) {
+func (m *MetricData) Update(cc *ConnectionCounts, tt TrafficType) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -44,11 +44,15 @@ func (m *MetricData) Update(cc *ConnectionCounts, tt TrafficType, proto uint8) {
 		cc.Src,
 		cc.Dst,
 		tt,
-		proto,
+		cc.Proto,
 		"",
 	}
-	for _, ct := range []string{"TxPackets", "RxPackets", "TxBytes", "RxBytes"} {
-		le.CountType = ct
-		m.data[le] += cc.TxPackets
-	}
+	le.CountType = "TxPackets"
+	m.data[le] += cc.TxPackets
+	le.CountType = "RxPackets"
+	m.data[le] += cc.RxPackets
+	le.CountType = "TxBytes"
+	m.data[le] += cc.TxBytes
+	le.CountType = "RxBytes"
+	m.data[le] += cc.RxBytes
 }
