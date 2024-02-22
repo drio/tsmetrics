@@ -26,11 +26,11 @@ var (
 )
 
 type AppConfig struct {
-	tailNetName  string
-	clientId     string
-	clientSecret string
-	server       *tsnet.Server
-	localClient  *tailscale.LocalClient
+	TailNetName  string
+	ClientId     string
+	ClientSecret string
+	Server       *tsnet.Server
+	LocalClient  *tailscale.LocalClient
 }
 
 type MetricType int
@@ -89,11 +89,11 @@ func main() {
 	*/
 
 	app := AppConfig{
-		tailNetName:  tailnetName,
-		clientId:     clientId,
-		clientSecret: clientSecret,
-		server:       s,
-		localClient:  lc,
+		TailNetName:  tailnetName,
+		ClientId:     clientId,
+		ClientSecret: clientSecret,
+		Server:       s,
+		LocalClient:  lc,
 	}
 
 	//app.getFromAPI()
@@ -122,7 +122,7 @@ func (a *AppConfig) addHandlers() {
 	http.Handle("/metrics", promhttp.Handler())
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		who, err := a.localClient.WhoIs(r.Context(), r.RemoteAddr)
+		who, err := a.LocalClient.WhoIs(r.Context(), r.RemoteAddr)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("Error : %v", err), http.StatusInternalServerError)
 		}
@@ -160,8 +160,8 @@ func createMetric(metricType MetricType, name string, help string) prometheus.Co
 func (a *AppConfig) getFromAPI() {
 	client, err := tscg.NewClient(
 		"",
-		a.tailNetName,
-		tscg.WithOAuthClientCredentials(a.clientId, a.clientSecret, nil),
+		a.TailNetName,
+		tscg.WithOAuthClientCredentials(a.ClientId, a.ClientSecret, nil),
 	)
 	if err != nil {
 		log.Fatalf("error: %s", err)
@@ -173,8 +173,8 @@ func (a *AppConfig) getFromAPI() {
 
 func (a *AppConfig) getFromLogs() {
 	var oauthConfig = &clientcredentials.Config{
-		ClientID:     a.clientId,
-		ClientSecret: a.clientSecret,
+		ClientID:     a.ClientId,
+		ClientSecret: a.ClientSecret,
 		TokenURL:     "https://api.tailscale.com/api/v2/oauth/token",
 	}
 	client := oauthConfig.Client(context.Background())
@@ -183,7 +183,7 @@ func (a *AppConfig) getFromLogs() {
 	tFormat := "2006-01-02T15:04:05.000000000Z"
 	start := now.Add(-5 * time.Minute).Format(tFormat)
 	end := now.Format(tFormat)
-	apiUrl := fmt.Sprintf("https://api.tailscale.com/api/v2/tailnet/%s/network-logs?start=%s&end=%s", a.tailNetName, start, end)
+	apiUrl := fmt.Sprintf("https://api.tailscale.com/api/v2/tailnet/%s/network-logs?start=%s&end=%s", a.TailNetName, start, end)
 	resp, err := client.Get(apiUrl)
 	if err != nil {
 		log.Fatalf("error get : %s %v", apiUrl, err)
