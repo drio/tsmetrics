@@ -5,42 +5,42 @@ import (
 	"sync"
 )
 
-type trafficType int
+type TrafficType int
 
 const (
-	VirtualTraffic trafficType = iota
+	VirtualTraffic TrafficType = iota
 	SubnetTraffic
 	ExitTraffic
 	PhysicalTraffic
 )
 
-type logEntry struct {
-	src         string
-	dst         string
-	trafficType trafficType
-	proto       uint8
-	countType   string
+type LogEntry struct {
+	Src         string
+	Dst         string
+	TrafficType TrafficType
+	Proto       uint8
+	CountType   string
 }
 
-func (l *logEntry) String() string {
-	return fmt.Sprintf(`%s_%s_%d_%d_%s`, l.src, l.dst, l.trafficType, l.proto, l.countType)
+func (l *LogEntry) String() string {
+	return fmt.Sprintf(`%s_%s_%d_%d_%s`, l.Src, l.Dst, l.TrafficType, l.Proto, l.CountType)
 }
 
-type metricData struct {
+type MetricData struct {
 	mu   sync.RWMutex
-	data map[logEntry]uint64
+	data map[LogEntry]uint64
 }
 
-func (m *metricData) Init() {
-	m.data = make(map[logEntry]uint64)
+func (m *MetricData) Init() {
+	m.data = make(map[LogEntry]uint64)
 }
 
 // Update based on the data from a new log entry (counts)
-func (m *metricData) Update(cc *ConnectionCounts, tt trafficType, proto uint8) {
+func (m *MetricData) Update(cc *ConnectionCounts, tt TrafficType, proto uint8) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	le := logEntry{
+	le := LogEntry{
 		cc.Src,
 		cc.Dst,
 		tt,
@@ -48,7 +48,7 @@ func (m *metricData) Update(cc *ConnectionCounts, tt trafficType, proto uint8) {
 		"",
 	}
 	for _, ct := range []string{"TxPackets", "RxPackets", "TxBytes", "RxBytes"} {
-		le.countType = ct
+		le.CountType = ct
 		m.data[le] += cc.TxPackets
 	}
 }
