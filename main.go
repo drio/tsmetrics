@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/tailscale/tailscale-client-go/tailscale"
+	tscg "github.com/tailscale/tailscale-client-go/tailscale"
 	"golang.org/x/oauth2/clientcredentials"
 )
 
@@ -25,6 +25,8 @@ type AppConfig struct {
 	TailNetName  string
 	ClientId     string
 	ClientSecret string
+	//Server       *tsnet.Server
+	//LocalClient  *tailscale.LocalClient
 }
 
 // TODO
@@ -125,10 +127,10 @@ func createMetric() {
 }
 
 func (a *AppConfig) getFromAPI() {
-	client, err := tailscale.NewClient(
+	client, err := tscg.NewClient(
 		"",
 		a.TailNetName,
-		tailscale.WithOAuthClientCredentials(a.ClientId, a.ClientSecret, nil),
+		tscg.WithOAuthClientCredentials(a.ClientId, a.ClientSecret, nil),
 	)
 	if err != nil {
 		log.Fatalf("error: %s", err)
@@ -174,12 +176,5 @@ func (a *AppConfig) getFromLogs() {
 		log.Fatalf("Failed to unmarshal JSON response: %v", err)
 	}
 
-	// Pretty print the JSON response
-	prettyJSON, err := json.MarshalIndent(apiResponse, "", "    ") // Use 4 spaces for indentation
-	if err != nil {
-		log.Fatalf("Failed to generate pretty JSON: %v", err)
-	}
-
-	fmt.Printf("Pretty Printed API Response:\n%s\n", string(prettyJSON))
-
+	fmt.Printf("# entries in logs : %d\n", len(apiResponse.Logs))
 }
