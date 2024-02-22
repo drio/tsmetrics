@@ -7,13 +7,17 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	tscg "github.com/tailscale/tailscale-client-go/tailscale"
 	"golang.org/x/oauth2/clientcredentials"
+	"tailscale.com/client/tailscale"
+	"tailscale.com/tsnet"
 )
 
 var (
@@ -25,8 +29,8 @@ type AppConfig struct {
 	TailNetName  string
 	ClientId     string
 	ClientSecret string
-	//Server       *tsnet.Server
-	//LocalClient  *tailscale.LocalClient
+	Server       *tsnet.Server
+	LocalClient  *tailscale.LocalClient
 }
 
 // TODO
@@ -71,8 +75,12 @@ func main() {
 		log.Fatal("Please, provide a TAILNET_NAME option")
 	}
 
+	var s *tsnet.Server
+	var lc *tailscale.LocalClient
+	var ln net.Listener
+
 	/*
-		s := new(tsnet.Server)
+		s = new(tsnet.Server)
 		s.Hostname = *hostname
 		defer s.Close()
 
@@ -83,38 +91,45 @@ func main() {
 		defer ln.Close()
 
 		// Get client to communicate to the local tailscaled
-		lc, err := s.LocalClient()
+		lc, err = s.LocalClient()
 		if err != nil {
 			log.Fatal(err)
 		}
 	*/
 
-	appConfig := AppConfig{
+	app := AppConfig{
 		TailNetName:  tailnetName,
 		ClientId:     clientId,
 		ClientSecret: clientSecret,
+		Server:       s,
+		LocalClient:  lc,
 	}
 
-	//appConfig.getFromAPI()
-	appConfig.getFromLogs()
+	app.getFromAPI()
+	app.getFromLogs()
 
-	/*
-		createMetric()
-		http.Handle("/metrics", promhttp.Handler())
+	app.createMetric()
+	app.addHandlers()
 
-		http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-			who, err := lc.WhoIs(r.Context(), r.RemoteAddr)
-			if err != nil {
-				http.Error(w, fmt.Sprintf("Error : %v", err), http.StatusInternalServerError)
-			}
-			fmt.Fprintf(w, "hello: %s", who.Node.Name)
-		})
+	if ln != nil {
 		log.Printf("starting server on %s", *addr)
 		log.Fatal(http.Serve(ln, nil))
-	*/
+	}
 }
 
-func createMetric() {
+func (a *AppConfig) addHandlers() {
+	http.Handle("/metrics", promhttp.Handler())
+
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		who, err := a.LocalClient.WhoIs(r.Context(), r.RemoteAddr)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("Error : %v", err), http.StatusInternalServerError)
+		}
+		fmt.Fprintf(w, "hello: %s", who.Node.Name)
+	})
+}
+
+func (a *AppConfig) createMetric() {
 	var aGauge = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "drio_random",
@@ -137,7 +152,7 @@ func (a *AppConfig) getFromAPI() {
 	}
 
 	devices, err := client.Devices(context.Background())
-	fmt.Printf("# of devices: %d", len(devices))
+	fmt.Printf("# of devices: %d\n", len(devices))
 }
 
 func (a *AppConfig) getFromLogs() {
