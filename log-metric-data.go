@@ -26,19 +26,19 @@ func (l *LogEntry) String() string {
 	return fmt.Sprintf(`%s_%s_%d_%d_%s`, l.Src, l.Dst, l.TrafficType, l.Proto, l.CountType)
 }
 
-type MetricData struct {
-	mu      sync.RWMutex
-	LogData map[LogEntry]uint64
+type LogMetricData struct {
+	mu   sync.RWMutex
+	data map[LogEntry]uint64
 }
 
-func (m *MetricData) Init() {
-	m.LogData = make(map[LogEntry]uint64)
+func (m *LogMetricData) Init() {
+	m.data = make(map[LogEntry]uint64)
 }
 
 // Update based on the data from a new log entry (counts)
 // TODO: src/dst are socket based. That will create high cardinality.
 // Consider dropping the port to reduce cardinality
-func (m *MetricData) Update(cc *ConnectionCounts, tt TrafficType) {
+func (m *LogMetricData) Update(cc *ConnectionCounts, tt TrafficType) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -50,11 +50,11 @@ func (m *MetricData) Update(cc *ConnectionCounts, tt TrafficType) {
 		"",
 	}
 	le.CountType = "TxPackets"
-	m.LogData[le] += cc.TxPackets
+	m.data[le] += cc.TxPackets
 	le.CountType = "RxPackets"
-	m.LogData[le] += cc.RxPackets
+	m.data[le] += cc.RxPackets
 	le.CountType = "TxBytes"
-	m.LogData[le] += cc.TxBytes
+	m.data[le] += cc.TxBytes
 	le.CountType = "RxBytes"
-	m.LogData[le] += cc.RxBytes
+	m.data[le] += cc.RxBytes
 }

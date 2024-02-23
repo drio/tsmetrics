@@ -39,6 +39,7 @@ type AppConfig struct {
 	ChLogMetrics         chan bool
 	ChAPIMetrics         chan bool
 	SleepIntervalSeconds int
+	LMData               *LogMetricData
 }
 
 type MetricType int
@@ -106,7 +107,9 @@ func main() {
 		ChLogMetrics:         make(chan bool),
 		ChAPIMetrics:         make(chan bool),
 		SleepIntervalSeconds: 60,
+		LMData:               &LogMetricData{},
 	}
+	app.LMData.Init()
 
 	//app.getFromAPI()
 	//app.getFromLogs()
@@ -115,7 +118,7 @@ func main() {
 
 	// TODO: Every x seconds we have to get data from the api logs and update the metrics
 	go app.produceLogDataLoop()
-	//go app.consumeNewLogData()
+	go app.consumeNewLogData()
 
 	//go app.produceAPIDataLoop()
 	//go app.consumeNewAPIData()
@@ -131,8 +134,8 @@ func main() {
 
 func (a *AppConfig) produceAPIDataLoop() {
 	fmt.Printf("api loop: starting\n")
-	for range a.ChAPIMetrics {
-		// TODO:
+	for {
+		a.ChAPIMetrics <- true
 		log.Printf("api loop: sleeping for %d secs", a.SleepIntervalSeconds)
 		time.Sleep(time.Duration(a.SleepIntervalSeconds) * time.Second)
 	}
@@ -140,8 +143,9 @@ func (a *AppConfig) produceAPIDataLoop() {
 
 func (a *AppConfig) produceLogDataLoop() {
 	log.Printf("log loop: starting\n")
-	for range a.ChLogMetrics {
+	for {
 		a.getNewLogData()
+		a.ChLogMetrics <- true
 		log.Printf("log loop: sleeping for %d secs", a.SleepIntervalSeconds)
 		time.Sleep(time.Duration(a.SleepIntervalSeconds) * time.Second)
 	}
@@ -161,9 +165,8 @@ func (a *AppConfig) registerLogMetrics() {
 func (a *AppConfig) consumeNewLogData() {
 	log.Printf("starting log metrics loop...\n")
 	for range a.ChLogMetrics {
-		log.Printf("new log metric data\n")
-		a.getNewLogData()
-		time.Sleep(1 * time.Second)
+		log.Printf("consuming new log metric data\n")
+		// TODO
 	}
 }
 
@@ -171,7 +174,6 @@ func (a *AppConfig) consumeNewAPIData() {
 	log.Printf("starting API metrics loop...\n")
 	for range a.ChAPIMetrics {
 		log.Printf("new API metric data\n")
-		time.Sleep(3 * time.Second)
 	}
 }
 
@@ -282,8 +284,30 @@ func (a *AppConfig) getNewLogData() {
 		return
 	}
 
-	// TODO:: Loop over the log entries and update the MetricData
-	// First, rename the MetricData .data to something else because we are going
-	// to have log data and regular api data
-	fmt.Printf("# entries in logs : %d\n", len(apiResponse.Logs))
+	log.Printf("getNewLogData(): %d new messages", len(apiResponse.Logs))
+	mc := []int{0, 0, 0, 0}
+	for _, msg := range apiResponse.Logs {
+		mc[0] += len(msg.VirtualTraffic)
+		for _, cc := range msg.VirtualTraffic {
+			a.LMData.Update(&cc, VirtualTraffic)
+		}
+
+		mc[1] += len(msg.SubnetTraffic)
+		for _, cc := range msg.SubnetTraffic {
+			a.LMData.Update(&cc, SubnetTraffic)
+		}
+
+		mc[2] += len(msg.ExitTraffic)
+		for _, cc := range msg.ExitTraffic {
+			a.LMData.Update(&cc, ExitTraffic)
+		}
+
+		mc[3] += len(msg.PhysicalTraffic)
+		for _, cc := range msg.PhysicalTraffic {
+			a.LMData.Update(&cc, PhysicalTraffic)
+		}
+	}
+	log.Printf("getNewLogData(): counts Virtual:%d | Subnet: %d | Exit: %d | Physical: %d",
+		mc[0], mc[1], mc[2], mc[3])
+	log.Printf("getNewLogData(): Number of LogMetricData entries: %d", len(a.LMData.data))
 }
