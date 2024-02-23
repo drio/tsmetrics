@@ -28,7 +28,8 @@ const (
 var (
 	addr          = flag.String("addr", ":9100", "address to listen on")
 	hostname      = flag.String("hostname", "metrics", "hostname to use on the tailnet (metrics)")
-	regularServer = flag.Bool("regular-server", false, "use to create a normal http server")
+	regularServer = flag.Bool("regularServer", false, "use to create a normal http server")
+	waitTimeSecs  = flag.Int("waitSecs", 45, "waiting time after getting new data")
 )
 
 type AppConfig struct {
@@ -97,7 +98,7 @@ func main() {
 		LocalClient:          lc,
 		LogMetrics:           map[string]*prometheus.CounterVec{},
 		APIMetrics:           map[string]*prometheus.GaugeVec{},
-		SleepIntervalSeconds: 60,
+		SleepIntervalSeconds: *waitTimeSecs,
 		LMData:               &LogMetricData{},
 	}
 	app.LMData.Init()
@@ -187,25 +188,25 @@ func (a *AppConfig) consumeNewLogData() {
 
 func (a *AppConfig) registerLogMetrics() {
 	labels := []string{"src", "dst", "traffic_type", "proto"}
-	n := "tailscale_tx_bytes_counter"
+	n := "tailscale_tx_bytes"
 	a.LogMetrics[n] = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Name: n,
 		Help: "Total number of bytes transmitted",
 	}, labels)
 
-	n = "tailscale_rx_bytes_counter"
+	n = "tailscale_rx_bytes"
 	a.LogMetrics[n] = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Name: n,
 		Help: "Total number of bytes received",
 	}, labels)
 
-	n = "tailscale_tx_packets_counter"
+	n = "tailscale_tx_packets"
 	a.LogMetrics[n] = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Name: n,
 		Help: "Total number of packets transmitted",
 	}, labels)
 
-	n = "tailscale_rx_packets_counter"
+	n = "tailscale_rx_packets"
 	a.LogMetrics[n] = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Name: n,
 		Help: "Total number of packets received",
@@ -218,7 +219,7 @@ func (a *AppConfig) registerLogMetrics() {
 
 func (a *AppConfig) registerAPIMetrics() {
 	labels := []string{"hostname", "update_available", "os", "is_external", "user", "client_version"}
-	n := "tailscale_hosts_gauge"
+	n := "tailscale_hosts"
 	a.APIMetrics[n] = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Name: n,
 		Help: "Hosts in the tailnet",
@@ -245,7 +246,7 @@ func (a *AppConfig) produceAPIDataLoop() {
 		}
 
 		for _, d := range devices {
-			a.APIMetrics["tailscale_hosts_gauge"].WithLabelValues(
+			a.APIMetrics["tailscale_hosts"].WithLabelValues(
 				d.Hostname,
 				strconv.FormatBool(d.UpdateAvailable),
 				d.OS,
