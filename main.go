@@ -162,7 +162,7 @@ func (a *AppConfig) consumeNewLogData() {
 	log.Printf("starting log metrics loop...\n")
 	for range a.ChLogMetrics {
 		log.Printf("new log metric data\n")
-		a.getFromLogs()
+		a.getNewLogData()
 		time.Sleep(1 * time.Second)
 	}
 }

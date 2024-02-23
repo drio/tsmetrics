@@ -27,12 +27,12 @@ func (l *LogEntry) String() string {
 }
 
 type MetricData struct {
-	mu   sync.RWMutex
-	data map[LogEntry]uint64
+	mu      sync.RWMutex
+	LogData map[LogEntry]uint64
 }
 
 func (m *MetricData) Init() {
-	m.data = make(map[LogEntry]uint64)
+	m.LogData = make(map[LogEntry]uint64)
 }
 
 // Update based on the data from a new log entry (counts)
@@ -50,11 +50,11 @@ func (m *MetricData) Update(cc *ConnectionCounts, tt TrafficType) {
 		"",
 	}
 	le.CountType = "TxPackets"
-	m.data[le] += cc.TxPackets
+	m.LogData[le] += cc.TxPackets
 	le.CountType = "RxPackets"
-	m.data[le] += cc.RxPackets
+	m.LogData[le] += cc.RxPackets
 	le.CountType = "TxBytes"
-	m.data[le] += cc.TxBytes
+	m.LogData[le] += cc.TxBytes
 	le.CountType = "RxBytes"
-	m.data[le] += cc.RxBytes
+	m.LogData[le] += cc.RxBytes
 }

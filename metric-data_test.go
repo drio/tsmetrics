@@ -8,8 +8,8 @@ func TestPing(t *testing.T) {
 	mData := MetricData{}
 	mData.Init()
 
-	if len(mData.data) != 0 {
-		t.Errorf("Expected the map to be empty but it is %d", len(mData.data))
+	if len(mData.LogData) != 0 {
+		t.Errorf("Expected the map to be empty but it is %d", len(mData.LogData))
 	}
 
 	cc := &ConnectionCounts{
@@ -38,8 +38,8 @@ func TestPing(t *testing.T) {
 			k,
 		}
 
-		if mData.data[le] != v {
-			t.Errorf("Expected data[%s]=%d got %d", le.String(), v, mData.data[le])
+		if mData.LogData[le] != v {
+			t.Errorf("Expected data[%s]=%d got %d", le.String(), v, mData.LogData[le])
 		}
 	}
 }
