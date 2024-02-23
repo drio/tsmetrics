@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"net"
 	"strings"
 	"sync"
@@ -71,6 +72,35 @@ func (m *LogMetricData) Init() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.data = make(MapLogEntryToValue)
+}
+
+func (m *LogMetricData) SaveNewData(apiResponse APILogResponse) {
+	log.Printf("getNewLogData(): %d new messages", len(apiResponse.Logs))
+	mc := []int{0, 0, 0, 0}
+	for _, msg := range apiResponse.Logs {
+		mc[0] += len(msg.VirtualTraffic)
+		for _, cc := range msg.VirtualTraffic {
+			m.Update(&cc, VirtualTraffic)
+		}
+
+		mc[1] += len(msg.SubnetTraffic)
+		for _, cc := range msg.SubnetTraffic {
+			m.Update(&cc, SubnetTraffic)
+		}
+
+		mc[2] += len(msg.ExitTraffic)
+		for _, cc := range msg.ExitTraffic {
+			m.Update(&cc, ExitTraffic)
+		}
+
+		mc[3] += len(msg.PhysicalTraffic)
+		for _, cc := range msg.PhysicalTraffic {
+			m.Update(&cc, PhysicalTraffic)
+		}
+	}
+	log.Printf("getNewLogData(): counts Virtual:%d | Subnet: %d | Exit: %d | Physical: %d",
+		mc[0], mc[1], mc[2], mc[3])
+	log.Printf("getNewLogData(): Number of LogMetricData entries: %d", len(m.data))
 }
 
 // Update based on the data from a new log entry (counts)

@@ -39,7 +39,6 @@ type AppConfig struct {
 	LocalClient          *tailscale.LocalClient
 	LogMetrics           map[string]*prometheus.CounterVec
 	APIMetrics           map[string]*prometheus.GaugeVec
-	ChLogMetrics         chan bool
 	SleepIntervalSeconds int
 	LMData               *LogMetricData
 }
@@ -91,15 +90,13 @@ func main() {
 	}
 
 	app := AppConfig{
-		TailNetName:  tailnetName,
-		ClientId:     clientId,
-		ClientSecret: clientSecret,
-		Server:       s,
-		LocalClient:  lc,
-		LogMetrics:   map[string]*prometheus.CounterVec{},
-		// FIXME: We probably want to have any type of metrics
+		TailNetName:          tailnetName,
+		ClientId:             clientId,
+		ClientSecret:         clientSecret,
+		Server:               s,
+		LocalClient:          lc,
+		LogMetrics:           map[string]*prometheus.CounterVec{},
 		APIMetrics:           map[string]*prometheus.GaugeVec{},
-		ChLogMetrics:         make(chan bool),
 		SleepIntervalSeconds: 60,
 		LMData:               &LogMetricData{},
 	}
@@ -110,12 +107,10 @@ func main() {
 	app.registerAPIMetrics()
 
 	go app.produceLogDataLoop()
-	// FIXME:Just update the prom metrics directly in the consumer. The prometheus
-	// library is thread safe.
-	go app.consumeNewLogData()
-	go app.getNewAPIData()
+	go app.produceAPIDataLoop()
 
 	if *regularServer {
+		log.Printf("starting regular server on %s", *addr)
 		if err := http.ListenAndServe(":9100", nil); err != nil {
 			panic(err)
 		}
@@ -128,100 +123,9 @@ func main() {
 func (a *AppConfig) produceLogDataLoop() {
 	log.Printf("log loop: starting\n")
 	for {
-		// Set the counters to zero
 		a.getNewLogData()
-		a.ChLogMetrics <- true
+		a.consumeNewLogData()
 		log.Printf("log loop: sleeping for %d secs", a.SleepIntervalSeconds)
-		time.Sleep(time.Duration(a.SleepIntervalSeconds) * time.Second)
-	}
-}
-
-func (a *AppConfig) registerLogMetrics() {
-	labels := []string{"src", "dst", "traffic_type", "proto"}
-	n := "tailscale_tx_bytes_counter"
-	a.LogMetrics[n] = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Name: n,
-		Help: "Total number of bytes transmitted",
-	}, labels)
-
-	n = "tailscale_rx_bytes_counter"
-	a.LogMetrics[n] = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Name: n,
-		Help: "Total number of bytes received",
-	}, labels)
-
-	n = "tailscale_tx_packets_counter"
-	a.LogMetrics[n] = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Name: n,
-		Help: "Total number of packets transmitted",
-	}, labels)
-
-	n = "tailscale_rx_packets_counter"
-	a.LogMetrics[n] = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Name: n,
-		Help: "Total number of packets received",
-	}, labels)
-
-	for name := range a.LogMetrics {
-		prometheus.MustRegister(a.LogMetrics[name])
-	}
-}
-
-func (a *AppConfig) registerAPIMetrics() {
-	labels := []string{"hostname", "update_available", "os", "is_external", "user", "client_version"}
-	n := "tailscale_hosts_gauge"
-	a.APIMetrics[n] = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-		Name: n,
-		Help: "Hosts in the tailnet",
-	}, labels)
-	prometheus.MustRegister(a.APIMetrics[n])
-}
-
-func (a *AppConfig) consumeNewLogData() {
-	log.Printf("starting log metrics loop...\n")
-	for range a.ChLogMetrics {
-		log.Printf("consuming new log metric data\n")
-		// Iterate over all the counters and update them with the data
-		for name, counter := range a.LogMetrics {
-			a.LMData.AddCounter(name, counter)
-		}
-		// We have updated the prometheus counters, reset the counters in the
-		// data structure. We do so because these are counters so we are always
-		// adding to them.
-		a.LMData.Init()
-	}
-}
-
-func (a *AppConfig) getNewAPIData() {
-	for {
-		log.Printf("getNewAPIData(): getting data")
-		client, err := tscg.NewClient(
-			"",
-			a.TailNetName,
-			tscg.WithOAuthClientCredentials(a.ClientId, a.ClientSecret, nil),
-		)
-		if err != nil {
-			log.Fatalf("error: %s", err)
-		}
-
-		devices, err := client.Devices(context.Background())
-		if err != nil {
-			log.Printf("getNewAPIData() error: %s", err)
-			return
-		}
-
-		for _, d := range devices {
-			a.APIMetrics["tailscale_hosts_gauge"].WithLabelValues(
-				d.Hostname,
-				strconv.FormatBool(d.UpdateAvailable),
-				d.OS,
-				strconv.FormatBool(d.IsExternal),
-				d.User,
-				d.ClientVersion,
-			).Set(1)
-
-		}
-		log.Printf("getNewAPIData(): sleeping for %d secs", a.SleepIntervalSeconds)
 		time.Sleep(time.Duration(a.SleepIntervalSeconds) * time.Second)
 	}
 }
@@ -266,32 +170,94 @@ func (a *AppConfig) getNewLogData() {
 		return
 	}
 
-	log.Printf("getNewLogData(): %d new messages", len(apiResponse.Logs))
-	mc := []int{0, 0, 0, 0}
-	for _, msg := range apiResponse.Logs {
-		mc[0] += len(msg.VirtualTraffic)
-		for _, cc := range msg.VirtualTraffic {
-			a.LMData.Update(&cc, VirtualTraffic)
-		}
+	a.LMData.SaveNewData(apiResponse)
+}
 
-		mc[1] += len(msg.SubnetTraffic)
-		for _, cc := range msg.SubnetTraffic {
-			a.LMData.Update(&cc, SubnetTraffic)
-		}
-
-		mc[2] += len(msg.ExitTraffic)
-		for _, cc := range msg.ExitTraffic {
-			a.LMData.Update(&cc, ExitTraffic)
-		}
-
-		mc[3] += len(msg.PhysicalTraffic)
-		for _, cc := range msg.PhysicalTraffic {
-			a.LMData.Update(&cc, PhysicalTraffic)
-		}
+func (a *AppConfig) consumeNewLogData() {
+	log.Printf("consuming new log metric data\n")
+	// Iterate over all the counters and update them with the data
+	for name, counter := range a.LogMetrics {
+		a.LMData.AddCounter(name, counter)
 	}
-	log.Printf("getNewLogData(): counts Virtual:%d | Subnet: %d | Exit: %d | Physical: %d",
-		mc[0], mc[1], mc[2], mc[3])
-	log.Printf("getNewLogData(): Number of LogMetricData entries: %d", len(a.LMData.data))
+	// We have updated the prometheus counters, reset the counters in the
+	// data structure. We do so because these are counters so we are always
+	// adding to them.
+	a.LMData.Init()
+}
+
+func (a *AppConfig) registerLogMetrics() {
+	labels := []string{"src", "dst", "traffic_type", "proto"}
+	n := "tailscale_tx_bytes_counter"
+	a.LogMetrics[n] = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: n,
+		Help: "Total number of bytes transmitted",
+	}, labels)
+
+	n = "tailscale_rx_bytes_counter"
+	a.LogMetrics[n] = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: n,
+		Help: "Total number of bytes received",
+	}, labels)
+
+	n = "tailscale_tx_packets_counter"
+	a.LogMetrics[n] = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: n,
+		Help: "Total number of packets transmitted",
+	}, labels)
+
+	n = "tailscale_rx_packets_counter"
+	a.LogMetrics[n] = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: n,
+		Help: "Total number of packets received",
+	}, labels)
+
+	for name := range a.LogMetrics {
+		prometheus.MustRegister(a.LogMetrics[name])
+	}
+}
+
+func (a *AppConfig) registerAPIMetrics() {
+	labels := []string{"hostname", "update_available", "os", "is_external", "user", "client_version"}
+	n := "tailscale_hosts_gauge"
+	a.APIMetrics[n] = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Name: n,
+		Help: "Hosts in the tailnet",
+	}, labels)
+	prometheus.MustRegister(a.APIMetrics[n])
+}
+
+func (a *AppConfig) produceAPIDataLoop() {
+	for {
+		log.Printf("produceAPIDataLoop(): getting data")
+		client, err := tscg.NewClient(
+			"",
+			a.TailNetName,
+			tscg.WithOAuthClientCredentials(a.ClientId, a.ClientSecret, nil),
+		)
+		if err != nil {
+			log.Fatalf("error: %s", err)
+		}
+
+		devices, err := client.Devices(context.Background())
+		if err != nil {
+			log.Printf("produceAPIDataLoop() error: %s", err)
+			return
+		}
+
+		for _, d := range devices {
+			a.APIMetrics["tailscale_hosts_gauge"].WithLabelValues(
+				d.Hostname,
+				strconv.FormatBool(d.UpdateAvailable),
+				d.OS,
+				strconv.FormatBool(d.IsExternal),
+				d.User,
+				d.ClientVersion,
+			).Set(1)
+
+		}
+		log.Printf("produceAPIDataLoop(): sleeping for %d secs", a.SleepIntervalSeconds)
+		time.Sleep(time.Duration(a.SleepIntervalSeconds) * time.Second)
+	}
 }
 
 func (a *AppConfig) addHandlers() {
