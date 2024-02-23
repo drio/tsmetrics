@@ -20,17 +20,25 @@ import (
 	"tailscale.com/tsnet"
 )
 
+const (
+	logApiDateFormat = "2006-01-02T15:04:05.000000000Z"
+)
+
 var (
 	addr     = flag.String("addr", ":9100", "address to listen on")
 	hostname = flag.String("hostname", "metrics", "hostname to use on the tailnet (metrics)")
 )
 
 type AppConfig struct {
-	TailNetName  string
-	ClientId     string
-	ClientSecret string
-	Server       *tsnet.Server
-	LocalClient  *tailscale.LocalClient
+	TailNetName          string
+	ClientId             string
+	ClientSecret         string
+	Server               *tsnet.Server
+	LocalClient          *tailscale.LocalClient
+	LogMetrics           map[string]prometheus.Collector
+	ChLogMetrics         chan bool
+	ChAPIMetrics         chan bool
+	SleepIntervalSeconds int
 }
 
 type MetricType int
@@ -89,44 +97,81 @@ func main() {
 	*/
 
 	app := AppConfig{
-		TailNetName:  tailnetName,
-		ClientId:     clientId,
-		ClientSecret: clientSecret,
-		Server:       s,
-		LocalClient:  lc,
+		TailNetName:          tailnetName,
+		ClientId:             clientId,
+		ClientSecret:         clientSecret,
+		Server:               s,
+		LocalClient:          lc,
+		LogMetrics:           map[string]prometheus.Collector{},
+		ChLogMetrics:         make(chan bool),
+		ChAPIMetrics:         make(chan bool),
+		SleepIntervalSeconds: 60,
 	}
 
 	//app.getFromAPI()
 	//app.getFromLogs()
 	app.addHandlers()
-
-	logMetrics := map[string]prometheus.Collector{}
-	n := "tailscale_tx_bytes_counter"
-	logMetrics[n] = createMetric(CounterMetric, n, "Total number of bytes transmitted")
-	n = "tailscale_rx_bytes_counter"
-	logMetrics[n] = createMetric(CounterMetric, n, "Total number of bytes received")
-	n = "tailscale_tx_packets_counter"
-	logMetrics[n] = createMetric(CounterMetric, n, "Total number of packets transmitted")
-	n = "tailscale_rx_packets_counter"
-	logMetrics[n] = createMetric(CounterMetric, n, "Total number of packets received")
+	app.registerLogMetrics()
 
 	// TODO: Every x seconds we have to get data from the api logs and update the metrics
-	chLogMetrics := make(chan bool)
-	chAPIMetrics := make(chan bool)
-	go updateLogMetrics(chLogMetrics)
-	go updateAPIMetrics(chAPIMetrics)
+	go app.produceLogDataLoop()
+	//go app.consumeNewLogData()
+
+	//go app.produceAPIDataLoop()
+	//go app.consumeNewAPIData()
+
+	foo := make(chan bool)
+	<-foo
 
 	if ln != nil {
 		log.Printf("starting server on %s", *addr)
 		log.Fatal(http.Serve(ln, nil))
 	}
+}
 
-	fmt.Printf("starting loop...\n")
-	for {
-		chLogMetrics <- true
+func (a *AppConfig) produceAPIDataLoop() {
+	fmt.Printf("api loop: starting\n")
+	for range a.ChAPIMetrics {
+		// TODO:
+		log.Printf("api loop: sleeping for %d secs", a.SleepIntervalSeconds)
+		time.Sleep(time.Duration(a.SleepIntervalSeconds) * time.Second)
+	}
+}
+
+func (a *AppConfig) produceLogDataLoop() {
+	log.Printf("log loop: starting\n")
+	for range a.ChLogMetrics {
+		a.getNewLogData()
+		log.Printf("log loop: sleeping for %d secs", a.SleepIntervalSeconds)
+		time.Sleep(time.Duration(a.SleepIntervalSeconds) * time.Second)
+	}
+}
+
+func (a *AppConfig) registerLogMetrics() {
+	n := "tailscale_tx_bytes_counter"
+	a.LogMetrics[n] = createMetric(CounterMetric, n, "Total number of bytes transmitted")
+	n = "tailscale_rx_bytes_counter"
+	a.LogMetrics[n] = createMetric(CounterMetric, n, "Total number of bytes received")
+	n = "tailscale_tx_packets_counter"
+	a.LogMetrics[n] = createMetric(CounterMetric, n, "Total number of packets transmitted")
+	n = "tailscale_rx_packets_counter"
+	a.LogMetrics[n] = createMetric(CounterMetric, n, "Total number of packets received")
+}
+
+func (a *AppConfig) consumeNewLogData() {
+	log.Printf("starting log metrics loop...\n")
+	for range a.ChLogMetrics {
+		log.Printf("new log metric data\n")
+		a.getFromLogs()
 		time.Sleep(1 * time.Second)
-		chAPIMetrics <- true
-		time.Sleep(2 * time.Second)
+	}
+}
+
+func (a *AppConfig) consumeNewAPIData() {
+	log.Printf("starting API metrics loop...\n")
+	for range a.ChAPIMetrics {
+		log.Printf("new API metric data\n")
+		time.Sleep(3 * time.Second)
 	}
 }
 
@@ -197,7 +242,8 @@ func (a *AppConfig) getFromAPI() {
 	fmt.Printf("# of devices: %d\n", len(devices))
 }
 
-func (a *AppConfig) getFromLogs() {
+// Iterate over the metrics data structure and update metrics as necessary
+func (a *AppConfig) getNewLogData() {
 	var oauthConfig = &clientcredentials.Config{
 		ClientID:     a.ClientId,
 		ClientSecret: a.ClientSecret,
@@ -206,32 +252,38 @@ func (a *AppConfig) getFromLogs() {
 	client := oauthConfig.Client(context.Background())
 
 	now := time.Now()
-	tFormat := "2006-01-02T15:04:05.000000000Z"
-	start := now.Add(-5 * time.Minute).Format(tFormat)
-	end := now.Format(tFormat)
+	start := now.Add(-time.Duration(a.SleepIntervalSeconds) * time.Minute).Format(logApiDateFormat)
+	end := now.Format(logApiDateFormat)
 	apiUrl := fmt.Sprintf("https://api.tailscale.com/api/v2/tailnet/%s/network-logs?start=%s&end=%s", a.TailNetName, start, end)
 	resp, err := client.Get(apiUrl)
 	if err != nil {
-		log.Fatalf("error get : %s %v", apiUrl, err)
+		log.Printf("error getNewLogData(): %s %v", apiUrl, err)
+		return
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		log.Fatalf("Unexpected status code: %d", resp.StatusCode)
+		log.Printf("error getNewLogData(): Unexpected status code: %d", resp.StatusCode)
+		return
 	}
 
 	// Read the response body
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		log.Fatalf("Failed to read response body: %v", err)
+		log.Printf("error getNewLogData(): Failed to read response body: %v", err)
+		return
 	}
 
 	// Unmarshal the JSON data into the struct
 	var apiResponse APILogResponse
 	err = json.Unmarshal(body, &apiResponse)
 	if err != nil {
-		log.Fatalf("Failed to unmarshal JSON response: %v", err)
+		log.Printf("error getNewLogData(): Failed to unmarshal JSON response: %v", err)
+		return
 	}
 
+	// TODO:: Loop over the log entries and update the MetricData
+	// First, rename the MetricData .data to something else because we are going
+	// to have log data and regular api data
 	fmt.Printf("# entries in logs : %d\n", len(apiResponse.Logs))
 }

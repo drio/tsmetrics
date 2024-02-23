@@ -36,6 +36,8 @@ func (m *MetricData) Init() {
 }
 
 // Update based on the data from a new log entry (counts)
+// TODO: src/dst are socket based. That will create high cardinality.
+// Consider dropping the port to reduce cardinality
 func (m *MetricData) Update(cc *ConnectionCounts, tt TrafficType) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
