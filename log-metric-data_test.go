@@ -31,8 +31,8 @@ func TestPing(t *testing.T) {
 	}
 	for k, v := range m {
 		le := LogEntry{
-			cc.Src,
-			cc.Dst,
+			hostOnly(cc.Src),
+			hostOnly(cc.Dst),
 			VirtualTraffic,
 			cc.Proto,
 			k,

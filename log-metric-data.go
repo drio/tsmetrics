@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 )
 
@@ -20,6 +21,14 @@ type LogEntry struct {
 	TrafficType TrafficType
 	Proto       uint8
 	CountType   string
+}
+
+func hostOnly(s string) string {
+	host, _, found := strings.Cut(s, ":")
+	if !found {
+		return "nosocket"
+	}
+	return host
 }
 
 func (l *LogEntry) String() string {
@@ -43,8 +52,8 @@ func (m *LogMetricData) Update(cc *ConnectionCounts, tt TrafficType) {
 	defer m.mu.Unlock()
 
 	le := LogEntry{
-		cc.Src,
-		cc.Dst,
+		hostOnly(cc.Src),
+		hostOnly(cc.Dst),
 		tt,
 		cc.Proto,
 		"",
