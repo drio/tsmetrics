@@ -78,21 +78,23 @@ func main() {
 	var lc *tailscale.LocalClient
 	var ln net.Listener
 
-	s = new(tsnet.Server)
-	s.Hostname = *hostname
-	defer s.Close()
+	/*
+		s = new(tsnet.Server)
+		s.Hostname = *hostname
+		defer s.Close()
 
-	ln, err := s.Listen("tcp", *addr)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer ln.Close()
+		ln, err := s.Listen("tcp", *addr)
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer ln.Close()
 
-	// Get client to communicate to the local tailscaled
-	lc, err = s.LocalClient()
-	if err != nil {
-		log.Fatal(err)
-	}
+		// Get client to communicate to the local tailscaled
+		lc, err = s.LocalClient()
+		if err != nil {
+			log.Fatal(err)
+		}
+	*/
 
 	app := AppConfig{
 		TailNetName:          tailnetName,
@@ -121,11 +123,12 @@ func main() {
 	if ln != nil {
 		log.Printf("starting server on %s", *addr)
 		log.Fatal(http.Serve(ln, nil))
+	} else {
+		// For testing (listen on local interface)
+		if err := http.ListenAndServe(":9100", nil); err != nil {
+			panic(err)
+		}
 	}
-
-	// if err := http.ListenAndServe(":9100", nil); err != nil {
-	// 	panic(err)
-	// }
 }
 
 func (a *AppConfig) produceAPIDataLoop() {
