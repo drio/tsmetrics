@@ -14,7 +14,6 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	tscg "github.com/tailscale/tailscale-client-go/tailscale"
 	"golang.org/x/oauth2/clientcredentials"
 	"tailscale.com/client/tailscale"
 	"tailscale.com/tsnet"
@@ -35,7 +34,7 @@ type AppConfig struct {
 	ClientSecret         string
 	Server               *tsnet.Server
 	LocalClient          *tailscale.LocalClient
-	LogMetrics           map[string]prometheus.Collector
+	LogMetrics           map[string]*prometheus.CounterVec
 	ChLogMetrics         chan bool
 	ChAPIMetrics         chan bool
 	SleepIntervalSeconds int
@@ -79,23 +78,21 @@ func main() {
 	var lc *tailscale.LocalClient
 	var ln net.Listener
 
-	/*
-		s = new(tsnet.Server)
-		s.Hostname = *hostname
-		defer s.Close()
+	s = new(tsnet.Server)
+	s.Hostname = *hostname
+	defer s.Close()
 
-		ln, err := s.Listen("tcp", *addr)
-		if err != nil {
-			log.Fatal(err)
-		}
-		defer ln.Close()
+	ln, err := s.Listen("tcp", *addr)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer ln.Close()
 
-		// Get client to communicate to the local tailscaled
-		lc, err = s.LocalClient()
-		if err != nil {
-			log.Fatal(err)
-		}
-	*/
+	// Get client to communicate to the local tailscaled
+	lc, err = s.LocalClient()
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	app := AppConfig{
 		TailNetName:          tailnetName,
@@ -103,7 +100,7 @@ func main() {
 		ClientSecret:         clientSecret,
 		Server:               s,
 		LocalClient:          lc,
-		LogMetrics:           map[string]prometheus.Collector{},
+		LogMetrics:           map[string]*prometheus.CounterVec{},
 		ChLogMetrics:         make(chan bool),
 		ChAPIMetrics:         make(chan bool),
 		SleepIntervalSeconds: 60,
@@ -111,8 +108,6 @@ func main() {
 	}
 	app.LMData.Init()
 
-	//app.getFromAPI()
-	//app.getFromLogs()
 	app.addHandlers()
 	app.registerLogMetrics()
 
@@ -123,13 +118,14 @@ func main() {
 	//go app.produceAPIDataLoop()
 	//go app.consumeNewAPIData()
 
-	foo := make(chan bool)
-	<-foo
-
 	if ln != nil {
 		log.Printf("starting server on %s", *addr)
 		log.Fatal(http.Serve(ln, nil))
 	}
+
+	// if err := http.ListenAndServe(":9100", nil); err != nil {
+	// 	panic(err)
+	// }
 }
 
 func (a *AppConfig) produceAPIDataLoop() {
@@ -144,6 +140,7 @@ func (a *AppConfig) produceAPIDataLoop() {
 func (a *AppConfig) produceLogDataLoop() {
 	log.Printf("log loop: starting\n")
 	for {
+		// Set the counters to zero
 		a.getNewLogData()
 		a.ChLogMetrics <- true
 		log.Printf("log loop: sleeping for %d secs", a.SleepIntervalSeconds)
@@ -152,21 +149,62 @@ func (a *AppConfig) produceLogDataLoop() {
 }
 
 func (a *AppConfig) registerLogMetrics() {
+	labels := []string{"src", "dst", "traffic_type", "proto"}
 	n := "tailscale_tx_bytes_counter"
-	a.LogMetrics[n] = createMetric(CounterMetric, n, "Total number of bytes transmitted")
+	a.LogMetrics[n] = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: n,
+		Help: "Total number of bytes transmitted",
+	}, labels)
+
 	n = "tailscale_rx_bytes_counter"
-	a.LogMetrics[n] = createMetric(CounterMetric, n, "Total number of bytes received")
+	a.LogMetrics[n] = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: n,
+		Help: "Total number of bytes received",
+	}, labels)
+
 	n = "tailscale_tx_packets_counter"
-	a.LogMetrics[n] = createMetric(CounterMetric, n, "Total number of packets transmitted")
+	a.LogMetrics[n] = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: n,
+		Help: "Total number of packets transmitted",
+	}, labels)
+
 	n = "tailscale_rx_packets_counter"
-	a.LogMetrics[n] = createMetric(CounterMetric, n, "Total number of packets received")
+	a.LogMetrics[n] = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: n,
+		Help: "Total number of packets received",
+	}, labels)
+
+	for name := range a.LogMetrics {
+		prometheus.MustRegister(a.LogMetrics[name])
+	}
 }
 
 func (a *AppConfig) consumeNewLogData() {
 	log.Printf("starting log metrics loop...\n")
 	for range a.ChLogMetrics {
 		log.Printf("consuming new log metric data\n")
-		// TODO
+		// Iterate over all the counters and update them with the data
+		for name, counter := range a.LogMetrics {
+			a.LMData.AddCounter(name, counter)
+		}
+		// We have updated the prometheus counters, reset the counters in the
+		// data structure. We do so because these are counters so we are always
+		// adding to them.
+		a.LMData.Init()
+	}
+}
+
+func updateMetric(metric prometheus.Collector, value float64) {
+	switch m := metric.(type) {
+	case prometheus.Gauge:
+		// If it's a Gauge, we can set the value directly
+		m.Set(value)
+	case prometheus.Counter:
+		// If it's a Counter, we add the value to it
+		m.Add(value)
+	default:
+		// If the metric is neither a Gauge nor a Counter, log an error or handle appropriately
+		log.Printf("The metric type is not supported for updating: %T\n", metric)
 	}
 }
 
@@ -195,54 +233,29 @@ func (a *AppConfig) addHandlers() {
 	http.Handle("/metrics", promhttp.Handler())
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		who, err := a.LocalClient.WhoIs(r.Context(), r.RemoteAddr)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("Error : %v", err), http.StatusInternalServerError)
-		}
-
-		fmt.Fprintf(w, "hello: %s", who.Node.Name)
+		// who, err := a.LocalClient.WhoIs(r.Context(), r.RemoteAddr)
+		// if err != nil {
+		// 	http.Error(w, fmt.Sprintf("Error : %v", err), http.StatusInternalServerError)
+		// }
+		//
+		// fmt.Fprintf(w, "hello: %s", who.Node.Name)
+		fmt.Fprintf(w, "hello")
 	})
 }
 
-// createMetric creates a metric (either a counter or a gauge)
-// based on the provided type, name, and help text.
-// It returns a prometheus.Collector, which both prometheus.Counter
-// and prometheus.Gauge satisfy.
-func createMetric(metricType MetricType, name string, help string) prometheus.Collector {
-	var metric prometheus.Collector
-
-	switch metricType {
-	case CounterMetric:
-		metric = prometheus.NewCounter(prometheus.CounterOpts{
-			Name: name,
-			Help: help,
-		})
-	case GaugeMetric:
-		metric = prometheus.NewGauge(prometheus.GaugeOpts{
-			Name: name,
-			Help: help,
-		})
-	}
-
-	// Register the metric with Prometheus's default registry
-	prometheus.MustRegister(metric)
-
-	return metric
-}
-
-func (a *AppConfig) getFromAPI() {
-	client, err := tscg.NewClient(
-		"",
-		a.TailNetName,
-		tscg.WithOAuthClientCredentials(a.ClientId, a.ClientSecret, nil),
-	)
-	if err != nil {
-		log.Fatalf("error: %s", err)
-	}
-
-	devices, err := client.Devices(context.Background())
-	fmt.Printf("# of devices: %d\n", len(devices))
-}
+// func (a *AppConfig) getFromAPI() {
+// 	client, err := tscg.NewClient(
+// 		"",
+// 		a.TailNetName,
+// 		tscg.WithOAuthClientCredentials(a.ClientId, a.ClientSecret, nil),
+// 	)
+// 	if err != nil {
+// 		log.Fatalf("error: %s", err)
+// 	}
+//
+// 	devices, err := client.Devices(context.Background())
+// 	fmt.Printf("# of devices: %d\n", len(devices))
+// }
 
 // Iterate over the metrics data structure and update metrics as necessary
 func (a *AppConfig) getNewLogData() {
