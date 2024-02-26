@@ -240,6 +240,8 @@ func (a *AppConfig) produceAPIDataLoop() {
 			log.Fatalf("error: %s", err)
 		}
 		a.updateAPIMetrics(client)
+		log.Printf("produceAPIDataLoop(): sleeping for %d secs", a.SleepIntervalSeconds)
+		time.Sleep(time.Duration(a.SleepIntervalSeconds) * time.Second)
 	}
 }
 
@@ -260,8 +262,6 @@ func (a *AppConfig) updateAPIMetrics(client APIClient) {
 			d.ClientVersion,
 		).Set(1)
 	}
-	log.Printf("produceAPIDataLoop(): sleeping for %d secs", a.SleepIntervalSeconds)
-	time.Sleep(time.Duration(a.SleepIntervalSeconds) * time.Second)
 }
 
 func (a *AppConfig) addHandlers() {
