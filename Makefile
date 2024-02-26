@@ -30,3 +30,7 @@ module:
 	rm -f *.mod
 	go mod init github.com/drio/$(PRJ)
 	go mod tidy	
+
+.PHONY: lint
+lint:
+	golangci-lint run

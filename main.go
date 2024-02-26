@@ -238,27 +238,29 @@ func (a *AppConfig) produceAPIDataLoop() {
 		if err != nil {
 			log.Fatalf("error: %s", err)
 		}
-
-		devices, err := client.Devices(context.Background())
-		if err != nil {
-			log.Printf("produceAPIDataLoop() error: %s", err)
-			return
-		}
-
-		for _, d := range devices {
-			a.APIMetrics["tailscale_hosts"].WithLabelValues(
-				d.Hostname,
-				strconv.FormatBool(d.UpdateAvailable),
-				d.OS,
-				strconv.FormatBool(d.IsExternal),
-				d.User,
-				d.ClientVersion,
-			).Set(1)
-
-		}
-		log.Printf("produceAPIDataLoop(): sleeping for %d secs", a.SleepIntervalSeconds)
-		time.Sleep(time.Duration(a.SleepIntervalSeconds) * time.Second)
+		a.updateAPIMetrics(client)
 	}
+}
+
+func (a *AppConfig) updateAPIMetrics(client *tscg.Client) {
+	devices, err := client.Devices(context.Background())
+	if err != nil {
+		log.Printf("produceAPIDataLoop() error: %s", err)
+		return
+	}
+
+	for _, d := range devices {
+		a.APIMetrics["tailscale_hosts"].WithLabelValues(
+			d.Hostname,
+			strconv.FormatBool(d.UpdateAvailable),
+			d.OS,
+			strconv.FormatBool(d.IsExternal),
+			d.User,
+			d.ClientVersion,
+		).Set(1)
+	}
+	log.Printf("produceAPIDataLoop(): sleeping for %d secs", a.SleepIntervalSeconds)
+	time.Sleep(time.Duration(a.SleepIntervalSeconds) * time.Second)
 }
 
 func (a *AppConfig) addHandlers() {
