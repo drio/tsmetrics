@@ -52,6 +52,10 @@ type APIClient interface {
 	Devices(context.Context) ([]tscg.Device, error)
 }
 
+type LogClient interface {
+	Get(string) (*http.Response, error)
+}
+
 func main() {
 	flag.Parse()
 
@@ -125,7 +129,13 @@ func main() {
 func (a *AppConfig) produceLogDataLoop() {
 	log.Printf("log loop: starting\n")
 	for {
-		a.getNewLogData()
+		var oauthConfig = &clientcredentials.Config{
+			ClientID:     a.ClientId,
+			ClientSecret: a.ClientSecret,
+			TokenURL:     "https://api.tailscale.com/api/v2/oauth/token",
+		}
+		client := oauthConfig.Client(context.Background())
+		a.getNewLogData(client)
 		a.consumeNewLogData()
 		log.Printf("log loop: sleeping for %d secs", a.SleepIntervalSeconds)
 		time.Sleep(time.Duration(a.SleepIntervalSeconds) * time.Second)
@@ -133,14 +143,7 @@ func (a *AppConfig) produceLogDataLoop() {
 }
 
 // Iterate over the metrics data structure and update metrics as necessary
-func (a *AppConfig) getNewLogData() {
-	var oauthConfig = &clientcredentials.Config{
-		ClientID:     a.ClientId,
-		ClientSecret: a.ClientSecret,
-		TokenURL:     "https://api.tailscale.com/api/v2/oauth/token",
-	}
-	client := oauthConfig.Client(context.Background())
-
+func (a *AppConfig) getNewLogData(client LogClient) {
 	now := time.Now()
 	start := now.Add(-time.Duration(a.SleepIntervalSeconds) * time.Minute).Format(logApiDateFormat)
 	end := now.Format(logApiDateFormat)
