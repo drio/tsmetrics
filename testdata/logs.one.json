@@ -1,0 +1,75 @@
+{
+  "logs": [
+    {
+      "nodeId": "aBcdef1CNTRL",
+      "logged": "2022-10-28T22:40:00.290605382Z",
+      "start": "2022-10-28T22:39:51.890385065Z",
+      "end": "2022-10-28T22:39:56.886545512Z",
+      "virtualTraffic": [
+        {
+          "proto": 6,
+          "src": "100.111.22.33:21291",
+          "dst": "100.111.44.55:63281",
+          "txPkts": 100,
+          "txBytes": 101,
+          "rxPkts": 200,
+          "rxBytes": 20100
+        },
+        {
+          "proto": 6,
+          "src": "100.111.22.33:21291",
+          "dst": "100.111.44.55:63280",
+          "txPkts": 300,
+          "txBytes": 301,
+          "rxPkts": 400,
+          "rxBytes": 401
+        }
+      ],
+      "physicalTraffic": [
+        {
+          "src": "100.44.55.66:0",
+          "dst": "192.168.0.101:41641",
+          "txPkts": 10,
+          "txBytes": 10,
+          "rxPkts": 20,
+          "rxBytes": 20
+        },
+        {
+          "src": "100.99.888.77:0",
+          "dst": "143.110.111.222:41641",
+          "txPkts": 40,
+          "txBytes": 41,
+          "rxPkts": 50,
+          "rxBytes": 51
+        }
+      ]
+    },
+    {
+      "nodeId": "uvwXyz2CNTRL",
+      "logged": "2022-10-28T22:40:00.344979725Z",
+      "start": "2022-10-28T22:39:53.286643402Z",
+      "end": "2022-10-28T22:39:58.286028244Z",
+      "virtualTraffic": [
+        {
+          "proto": 6,
+          "src": "100.44.55.66:49284",
+          "dst": "100.99.888.77:22",
+          "txPkts": 1,
+          "txBytes": 2,
+          "rxPkts": 3,
+          "rxBytes": 4
+        }
+      ],
+      "physicalTraffic": [
+        {
+          "src": "100.99.888.77:0",
+          "dst": "143.110.111.222:41641",
+          "txPkts": 5,
+          "txBytes": 6,
+          "rxPkts": 7,
+          "rxBytes": 8
+        }
+      ]
+    }
+  ]
+}
