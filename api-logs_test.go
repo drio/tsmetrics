@@ -102,7 +102,7 @@ func (f *FakeClientLog) Get(url string) (*http.Response, error) {
 }
 
 func TestLogMetrics(t *testing.T) {
-	t.Run("XXX", func(t *testing.T) {
+	t.Run("We expose the correct counter values after two consecutive calls", func(t *testing.T) {
 		app := AppConfig{
 			LogMetrics:           map[string]*prometheus.CounterVec{},
 			SleepIntervalSeconds: *waitTimeSecs,
