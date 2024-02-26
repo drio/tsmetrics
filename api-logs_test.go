@@ -54,27 +54,13 @@ func TestAPIMetrics(t *testing.T) {
 		app.updateAPIMetrics(&fClient)
 
 		mName := "tailscale_hosts"
-		metrics, err := prometheus.DefaultGatherer.Gather()
-		if err != nil {
-			t.Fatalf("Error gathering metrics: %v", err)
-		}
-
 		c := qt.New(t)
-		hostToMetric := map[string]map[string]string{}
-		for _, mf := range metrics {
-			if *mf.Name == mName {
-				for _, metric := range mf.GetMetric() {
-					labels := make(map[string]string)
-					for _, label := range metric.GetLabel() {
-						labels[label.GetName()] = label.GetValue()
-					}
-					c.Assert(len(labels), qt.Equals, 6)
-					hostToMetric[labels["hostname"]] = labels
-				}
-			}
-		}
+		hostToMetric := gatherMetricsForTests("hostname", mName, t)
+		c.Assert(len(hostToMetric), qt.Equals, 2)
 
+		// TODO: Pull this from the json truth
 		hello := hostToMetric["hello"]
+		c.Assert(len(hello), qt.Equals, 6)
 		c.Assert(hello["hostname"], qt.Equals, "hello")
 		c.Assert(hello["update_available"], qt.Equals, "false")
 		c.Assert(hello["os"], qt.Equals, "linux")
@@ -83,12 +69,34 @@ func TestAPIMetrics(t *testing.T) {
 		c.Assert(hello["client_version"], qt.Equals, "1.1.1")
 
 		foo := hostToMetric["foo"]
+		c.Assert(len(foo), qt.Equals, 6)
 		c.Assert(foo["hostname"], qt.Equals, "foo")
 		c.Assert(foo["update_available"], qt.Equals, "true")
 		c.Assert(foo["os"], qt.Equals, "macos")
 		c.Assert(foo["is_external"], qt.Equals, "false")
 		c.Assert(foo["user"], qt.Equals, "rufus@foo.net")
 		c.Assert(foo["client_version"], qt.Equals, "2.2.2")
-
 	})
+}
+
+func gatherMetricsForTests(key, mName string, t *testing.T) map[string]map[string]string {
+	metrics, err := prometheus.DefaultGatherer.Gather()
+	if err != nil {
+		t.Fatalf("Error gathering metrics: key: %s, name: %s err=%s", key, mName, err)
+	}
+
+	hostToMetric := map[string]map[string]string{}
+	for _, mf := range metrics {
+		if *mf.Name == mName {
+			for _, metric := range mf.GetMetric() {
+				labels := make(map[string]string)
+				for _, label := range metric.GetLabel() {
+					labels[label.GetName()] = label.GetValue()
+				}
+				hostToMetric[labels[key]] = labels
+			}
+		}
+	}
+
+	return hostToMetric
 }
