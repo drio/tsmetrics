@@ -4,7 +4,7 @@ import (
 	"testing"
 )
 
-func TestPing(t *testing.T) {
+func TestMetricData(t *testing.T) {
 	mData := LogMetricData{}
 	mData.Init()
 

@@ -21,8 +21,12 @@ import (
 	"tailscale.com/tsnet"
 )
 
+type MetricType int
+
 const (
-	logApiDateFormat = "2006-01-02T15:04:05.000000000Z"
+	logApiDateFormat            = "2006-01-02T15:04:05.000000000Z"
+	CounterMetric    MetricType = iota
+	GaugeMetric
 )
 
 var (
@@ -44,12 +48,9 @@ type AppConfig struct {
 	LMData               *LogMetricData
 }
 
-type MetricType int
-
-const (
-	CounterMetric MetricType = iota
-	GaugeMetric
-)
+type APIClient interface {
+	Devices(context.Context) ([]tscg.Device, error)
+}
 
 func main() {
 	flag.Parse()
@@ -242,7 +243,7 @@ func (a *AppConfig) produceAPIDataLoop() {
 	}
 }
 
-func (a *AppConfig) updateAPIMetrics(client *tscg.Client) {
+func (a *AppConfig) updateAPIMetrics(client APIClient) {
 	devices, err := client.Devices(context.Background())
 	if err != nil {
 		log.Printf("produceAPIDataLoop() error: %s", err)
