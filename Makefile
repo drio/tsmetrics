@@ -18,7 +18,9 @@ coverage/html:
 	go tool cover -html=c.out
 
 run/local:
-	@bash -c 'set -a; source <(cat .env | sed "s/#.*//g" | xargs); set +a && go run . --regularServer'
+	@bash -c 'set -a; source <(cat .env | \
+		sed "s/#.*//g" | xargs); \
+		set +a && go run . --addr=:9100 --regular-server'
 
 build: $(BINS)
 

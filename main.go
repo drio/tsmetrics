@@ -9,6 +9,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/netip"
 	"os"
 	"strconv"
 	"time"
@@ -32,9 +33,12 @@ const (
 var (
 	addr          = flag.String("addr", ":9100", "address to listen on")
 	hostname      = flag.String("hostname", "metrics", "hostname to use on the tailnet (metrics)")
-	regularServer = flag.Bool("regularServer", false, "use to create a normal http server")
-	waitTimeSecs  = flag.Int("waitSecs", 45, "waiting time after getting new data")
+	regularServer = flag.Bool("regular-server", false, "use to create a normal http server")
+	waitTimeSecs  = flag.Int("wait-secs", 45, "waiting time after getting new data")
+	resolveNames  = flag.Bool("resolve-names", false, "convert tailscale IP addresses to hostnames")
 )
+
+var namesByAddr map[netip.Addr]string
 
 type AppConfig struct {
 	TailNetName          string
@@ -106,6 +110,12 @@ func main() {
 		SleepIntervalSeconds: *waitTimeSecs,
 		LMData:               &LogMetricData{},
 	}
+
+	if *resolveNames {
+		client := app.getOAuthClient()
+		namesByAddr = mustMakeNamesByAddr(&tailnetName, client)
+	}
+
 	app.LMData.Init()
 
 	app.addHandlers()
@@ -129,17 +139,21 @@ func main() {
 func (a *AppConfig) produceLogDataLoop() {
 	log.Printf("log loop: starting\n")
 	for {
-		var oauthConfig = &clientcredentials.Config{
-			ClientID:     a.ClientId,
-			ClientSecret: a.ClientSecret,
-			TokenURL:     "https://api.tailscale.com/api/v2/oauth/token",
-		}
-		client := oauthConfig.Client(context.Background())
+		client := a.getOAuthClient()
 		a.getNewLogData(client)
 		a.consumeNewLogData()
 		log.Printf("log loop: sleeping for %d secs", a.SleepIntervalSeconds)
 		time.Sleep(time.Duration(a.SleepIntervalSeconds) * time.Second)
 	}
+}
+
+func (a *AppConfig) getOAuthClient() *http.Client {
+	var oauthConfig = &clientcredentials.Config{
+		ClientID:     a.ClientId,
+		ClientSecret: a.ClientSecret,
+		TokenURL:     "https://api.tailscale.com/api/v2/oauth/token",
+	}
+	return oauthConfig.Client(context.Background())
 }
 
 // Iterate over the metrics data structure and update metrics as necessary
