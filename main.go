@@ -18,7 +18,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	tscg "github.com/tailscale/tailscale-client-go/tailscale"
 	"golang.org/x/oauth2/clientcredentials"
-	"tailscale.com/client/tailscale"
 	"tailscale.com/tsnet"
 )
 
@@ -43,7 +42,6 @@ type AppConfig struct {
 	ClientId             string
 	ClientSecret         string
 	Server               *tsnet.Server
-	LocalClient          *tailscale.LocalClient
 	LogMetrics           map[string]*prometheus.CounterVec
 	APIMetrics           map[string]*prometheus.GaugeVec
 	SleepIntervalSeconds int
@@ -77,10 +75,10 @@ func main() {
 	}
 
 	var s *tsnet.Server
-	var lc *tailscale.LocalClient
 	var ln net.Listener
 
 	if !*regularServer {
+		log.Printf("using tsnet")
 		s = new(tsnet.Server)
 		s.Hostname = *hostname
 		defer s.Close()
@@ -90,12 +88,6 @@ func main() {
 			log.Fatal(err)
 		}
 		defer ln.Close()
-
-		// Get client to communicate to the local tailscaled
-		lc, err = s.LocalClient()
-		if err != nil {
-			log.Fatal(err)
-		}
 	}
 
 	app := AppConfig{
@@ -103,7 +95,6 @@ func main() {
 		ClientId:             clientId,
 		ClientSecret:         clientSecret,
 		Server:               s,
-		LocalClient:          lc,
 		LogMetrics:           map[string]*prometheus.CounterVec{},
 		APIMetrics:           map[string]*prometheus.GaugeVec{},
 		SleepIntervalSeconds: *waitTimeSecs,
@@ -131,6 +122,9 @@ func main() {
 		}
 	} else {
 		log.Printf("starting server on %s", *addr)
+		if ln == nil {
+			log.Fatal("ln is nil")
+		}
 		log.Fatal(http.Serve(ln, nil))
 	}
 }

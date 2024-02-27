@@ -17,6 +17,13 @@ coverage/html:
 	go test -v -cover -coverprofile=c.out
 	go tool cover -html=c.out
 
+.PHONY:run
+run:
+	@bash -c 'set -a; source <(cat .env | \
+		sed "s/#.*//g" | xargs); \
+		set +a && go run . --addr=:9100 --resolve-names'
+
+.PHONY: run/local
 run/local:
 	@bash -c 'set -a; source <(cat .env | \
 		sed "s/#.*//g" | xargs); \
