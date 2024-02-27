@@ -68,14 +68,6 @@ func (f *FakeClientLog) Get(url string) (*http.Response, error) {
 	return response, nil
 }
 
-func TestMain(m *testing.M) {
-	fmt.Println("Set up stuff for tests here")
-	prometheus.NewRegistry()
-	exitVal := m.Run()
-	fmt.Println("Clean up stuff after tests here")
-	os.Exit(exitVal)
-}
-
 func TestAPIMetrics(t *testing.T) {
 	t.Run("metric tailscale_hosts", func(t *testing.T) {
 		app := AppConfig{
@@ -113,76 +105,75 @@ func TestAPIMetrics(t *testing.T) {
 		c.Assert(foo["is_external"], qt.Equals, "false")
 		c.Assert(foo["user"], qt.Equals, "rufus@foo.net")
 		c.Assert(foo["client_version"], qt.Equals, "2.2.2")
+
 	})
 }
 
-func TestLogMetrics(t *testing.T) {
-	// t.Run("We expose the correct counter values after two consecutive calls", func(t *testing.T) {
-	// 	app := AppConfig{
-	// 		LogMetrics:           map[string]*prometheus.CounterVec{},
-	// 		SleepIntervalSeconds: *waitTimeSecs,
-	// 		LMData:               &LogMetricData{},
-	// 	}
-	// 	app.LMData.Init()
-	// 	app.registerLogMetrics()
-	//
-	// 	fClient := FakeClientLog{}
-	// 	fClient.SetJson(logOne)
-	// 	app.getNewLogData(&fClient)
-	// 	app.consumeNewLogData()
-	//
-	// 	mName := "tailscale_tx_packets"
-	// 	c := qt.New(t)
-	// 	srcToMetric := gatherLabels("src", mName, t)
-	// 	c.Assert(len(srcToMetric), qt.Equals, 3)
-	//
-	// 	src := "100.111.22.33"
-	// 	val, found := getMetricValueWithSrc(src, mName, t)
-	// 	fmt.Printf("\n%f, %t\n", val, found)
-	// 	c.Assert(found, qt.Equals, true)
-	// 	c.Assert(val, qt.Equals, 400.0)
-	//
-	// 	// Make a new call to get new counters and check again the metric values
-	// 	// the second log file matches the first one so the values should just double.
-	// 	fClient.SetJson(logTwo)
-	// 	app.getNewLogData(&fClient)
-	// 	app.consumeNewLogData()
-	// 	val, found = getMetricValueWithSrc(src, mName, t)
-	// 	fmt.Printf("\n%f, %t\n", val, found)
-	// 	c.Assert(found, qt.Equals, true)
-	// 	c.Assert(val, qt.Equals, 800.0)
-	// })
+func TestMain(m *testing.M) {
+	exitVal := m.Run()
+	os.Exit(exitVal)
+}
 
-	t.Run("We resolve ips to hostnames", func(t *testing.T) {
+func TestLogMetrics(t *testing.T) {
+	t.Run("We expose the correct counter values after two consecutive calls", func(t *testing.T) {
 		app := AppConfig{
 			LogMetrics:           map[string]*prometheus.CounterVec{},
 			SleepIntervalSeconds: *waitTimeSecs,
 			LMData:               &LogMetricData{},
 		}
-
-		fClient := FakeClientLog{}
-		fClient.SetJson(jsonDevicesTwo)
-		tailNet := "dummy"
-		app.NamesByAddr = mustMakeNamesByAddr(&tailNet, &fClient)
-		fmt.Printf("\n %v \n", app.NamesByAddr)
-
 		app.LMData.Init()
 		app.registerLogMetrics()
 
-		fClient.SetJson(logThree)
+		fClient := FakeClientLog{}
+		fClient.SetJson(logOne)
 		app.getNewLogData(&fClient)
 		app.consumeNewLogData()
 
 		mName := "tailscale_tx_packets"
 		c := qt.New(t)
 		srcToMetric := gatherLabels("src", mName, t)
-		c.Assert(len(srcToMetric), qt.Equals, 1)
+		c.Assert(len(srcToMetric), qt.Equals, 3)
 
-		src := "hello"
+		src := "100.111.22.33"
 		val, found := getMetricValueWithSrc(src, mName, t)
 		fmt.Printf("\n%f, %t\n", val, found)
 		c.Assert(found, qt.Equals, true)
+		c.Assert(val, qt.Equals, 400.0)
+
+		// Make a new call to get new counters and check again the metric values
+		// the second log file matches the first one so the values should just double.
+		fClient.SetJson(logTwo)
+		app.getNewLogData(&fClient)
+		app.consumeNewLogData()
+		val, found = getMetricValueWithSrc(src, mName, t)
+		fmt.Printf("\n%f, %t\n", val, found)
+		c.Assert(found, qt.Equals, true)
+		c.Assert(val, qt.Equals, 800.0)
+
+		// TODO: this test should have its own subtest. I have it here
+		// otherwise I get an error where prometheus tells me I am trying TODO
+		// register metrics twice:
+		// panic: duplicate metrics collector registration attempted
+		// subtest name: Make sure we can resolve names
+		app.LMData.Init()
+
+		fClient.SetJson(jsonDevicesTwo)
+		tailNet := "dummy"
+		app.NamesByAddr = mustMakeNamesByAddr(&tailNet, &fClient)
+
+		fClient.SetJson(logThree)
+		app.getNewLogData(&fClient)
+		app.consumeNewLogData()
+
+		mName = "tailscale_tx_packets"
+		src = "hello"
+		val, found = getMetricValueWithSrc(src, mName, t)
+		fmt.Printf("\n%f, %t\n", val, found)
+		c.Assert(found, qt.Equals, true)
 		c.Assert(val, qt.Equals, 130.0)
+	})
+
+	t.Run("We resolve names", func(t *testing.T) {
 	})
 }
 
