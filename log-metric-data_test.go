@@ -2,6 +2,8 @@ package main
 
 import (
 	"testing"
+
+	qt "github.com/frankban/quicktest"
 )
 
 func TestMetricData(t *testing.T) {
@@ -37,9 +39,9 @@ func TestMetricData(t *testing.T) {
 			cc.Proto,
 			k,
 		}
-
-		if mData.data[le] != v {
-			t.Errorf("Expected data[%s]=%d got %d", le.String(), v, mData.data[le])
-		}
+		c := qt.New(t)
+		c.Assert(mData.data[le], qt.Equals, v)
 	}
 }
+
+// TODO: test hostname resolve

@@ -1,0 +1,26 @@
+{
+  "devices": [
+    {
+      "addresses": [
+        "100.111.22.33",
+        "fd7a:115c:a1e0:ab12:4843:cd96:6265:6667"
+      ],
+      "authorized": true,
+      "blocksIncomingConnections": false,
+      "clientVersion": "1.1.1",
+      "created": "",
+      "expires": "0001-01-01T00:00:00Z",
+      "hostname": "hello",
+      "id": "50052",
+      "isExternal": true,
+      "keyExpiryDisabled": true,
+      "lastSeen": "2022-04-15T13:24:40Z",
+      "machineKey": "",
+      "name": "hello.tailscale.com",
+      "nodeKey": "nodekey:30dc3c061ac8b33fdc6d88a4a67b053b01b56930d78cae0cf7a164411d424c0d",
+      "os": "linux",
+      "updateAvailable": false,
+      "user": "perucho@foo.net"
+    }
+  ]
+}

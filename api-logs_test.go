@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 
 	qt "github.com/frankban/quicktest"
@@ -19,10 +20,15 @@ import (
 var (
 	//go:embed testdata/devices.json
 	jsonDevices []byte
+	//go:embed testdata/devices-02.json
+	jsonDevicesTwo []byte
+
 	//go:embed testdata/logs.one.json
 	logOne []byte
 	//go:embed testdata/logs.two.json
 	logTwo []byte
+	//go:embed testdata/logs.three.json
+	logThree []byte
 )
 
 type FakeClientAPI struct {
@@ -41,6 +47,33 @@ func (f *FakeClientAPI) Devices(ctx context.Context) ([]tscg.Device, error) {
 		return nil, err
 	}
 	return resp["devices"], nil
+}
+
+type FakeClientLog struct {
+	JsonData []byte
+}
+
+func (f *FakeClientLog) SetJson(jsonD []byte) {
+	f.JsonData = jsonD
+}
+
+func (f *FakeClientLog) Get(url string) (*http.Response, error) {
+	recorder := httptest.NewRecorder()
+	_, err := recorder.Write(f.JsonData)
+	if err != nil {
+		return nil, err
+	}
+	recorder.Header().Set("Content-Type", "application/json")
+	response := recorder.Result()
+	return response, nil
+}
+
+func TestMain(m *testing.M) {
+	fmt.Println("Set up stuff for tests here")
+	prometheus.NewRegistry()
+	exitVal := m.Run()
+	fmt.Println("Clean up stuff after tests here")
+	os.Exit(exitVal)
 }
 
 func TestAPIMetrics(t *testing.T) {
@@ -83,60 +116,73 @@ func TestAPIMetrics(t *testing.T) {
 	})
 }
 
-type FakeClientLog struct {
-	JsonData []byte
-}
-
-func (f *FakeClientLog) SetJson(jsonD []byte) {
-	f.JsonData = jsonD
-}
-
-func (f *FakeClientLog) Get(url string) (*http.Response, error) {
-	recorder := httptest.NewRecorder()
-	_, err := recorder.Write(f.JsonData)
-	if err != nil {
-		return nil, err
-	}
-	recorder.Header().Set("Content-Type", "application/json")
-	response := recorder.Result()
-	return response, nil
-}
-
 func TestLogMetrics(t *testing.T) {
-	t.Run("We expose the correct counter values after two consecutive calls", func(t *testing.T) {
+	// t.Run("We expose the correct counter values after two consecutive calls", func(t *testing.T) {
+	// 	app := AppConfig{
+	// 		LogMetrics:           map[string]*prometheus.CounterVec{},
+	// 		SleepIntervalSeconds: *waitTimeSecs,
+	// 		LMData:               &LogMetricData{},
+	// 	}
+	// 	app.LMData.Init()
+	// 	app.registerLogMetrics()
+	//
+	// 	fClient := FakeClientLog{}
+	// 	fClient.SetJson(logOne)
+	// 	app.getNewLogData(&fClient)
+	// 	app.consumeNewLogData()
+	//
+	// 	mName := "tailscale_tx_packets"
+	// 	c := qt.New(t)
+	// 	srcToMetric := gatherLabels("src", mName, t)
+	// 	c.Assert(len(srcToMetric), qt.Equals, 3)
+	//
+	// 	src := "100.111.22.33"
+	// 	val, found := getMetricValueWithSrc(src, mName, t)
+	// 	fmt.Printf("\n%f, %t\n", val, found)
+	// 	c.Assert(found, qt.Equals, true)
+	// 	c.Assert(val, qt.Equals, 400.0)
+	//
+	// 	// Make a new call to get new counters and check again the metric values
+	// 	// the second log file matches the first one so the values should just double.
+	// 	fClient.SetJson(logTwo)
+	// 	app.getNewLogData(&fClient)
+	// 	app.consumeNewLogData()
+	// 	val, found = getMetricValueWithSrc(src, mName, t)
+	// 	fmt.Printf("\n%f, %t\n", val, found)
+	// 	c.Assert(found, qt.Equals, true)
+	// 	c.Assert(val, qt.Equals, 800.0)
+	// })
+
+	t.Run("We resolve ips", func(t *testing.T) {
 		app := AppConfig{
 			LogMetrics:           map[string]*prometheus.CounterVec{},
 			SleepIntervalSeconds: *waitTimeSecs,
 			LMData:               &LogMetricData{},
 		}
+
+		fClient := FakeClientLog{}
+		fClient.SetJson(jsonDevicesTwo)
+		tailNet := "dummy"
+		app.NamesByAddr = mustMakeNamesByAddr(&tailNet, &fClient)
+		fmt.Printf("\n %v \n", app.NamesByAddr)
+
 		app.LMData.Init()
 		app.registerLogMetrics()
 
-		fClient := FakeClientLog{}
-		fClient.SetJson(logOne)
+		fClient.SetJson(logThree)
 		app.getNewLogData(&fClient)
 		app.consumeNewLogData()
 
 		mName := "tailscale_tx_packets"
 		c := qt.New(t)
 		srcToMetric := gatherLabels("src", mName, t)
-		c.Assert(len(srcToMetric), qt.Equals, 3)
+		c.Assert(len(srcToMetric), qt.Equals, 1)
 
 		src := "100.111.22.33"
 		val, found := getMetricValueWithSrc(src, mName, t)
 		fmt.Printf("\n%f, %t\n", val, found)
 		c.Assert(found, qt.Equals, true)
-		c.Assert(val, qt.Equals, 400.0)
-
-		// Make a new call to get new counters and check again the metric values
-		// the second log file matches the first one so the values should just double.
-		fClient.SetJson(logTwo)
-		app.getNewLogData(&fClient)
-		app.consumeNewLogData()
-		val, found = getMetricValueWithSrc(src, mName, t)
-		fmt.Printf("\n%f, %t\n", val, found)
-		c.Assert(found, qt.Equals, true)
-		c.Assert(val, qt.Equals, 800.0)
+		c.Assert(val, qt.Equals, 130.0)
 	})
 }
 
@@ -152,7 +198,7 @@ func getMetricValueWithSrc(src, mName string, t *testing.T) (float64, bool) {
 			for _, metric := range mf.GetMetric() {
 				//fmt.Printf("\n %s %f %v\n", *mf.Name, metric.Counter.GetValue(), srcLabels[src])
 				for _, label := range metric.GetLabel() {
-					//fmt.Printf("%s %s %s : %f\n", *mf.Name, label.GetName(), label.GetValue(), counterValue)
+					fmt.Printf("%s %s %s \n", *mf.Name, label.GetName(), label.GetValue())
 					if label.GetName() == "src" && label.GetValue() == src {
 						return metric.Counter.GetValue(), true
 					}

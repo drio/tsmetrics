@@ -38,8 +38,6 @@ var (
 	resolveNames  = flag.Bool("resolve-names", false, "convert tailscale IP addresses to hostnames")
 )
 
-var namesByAddr map[netip.Addr]string
-
 type AppConfig struct {
 	TailNetName          string
 	ClientId             string
@@ -50,6 +48,7 @@ type AppConfig struct {
 	APIMetrics           map[string]*prometheus.GaugeVec
 	SleepIntervalSeconds int
 	LMData               *LogMetricData
+	NamesByAddr          map[netip.Addr]string
 }
 
 type APIClient interface {
@@ -113,7 +112,7 @@ func main() {
 
 	if *resolveNames {
 		client := app.getOAuthClient()
-		namesByAddr = mustMakeNamesByAddr(&tailnetName, client)
+		app.NamesByAddr = mustMakeNamesByAddr(&tailnetName, client)
 	}
 
 	app.LMData.Init()
@@ -196,7 +195,7 @@ func (a *AppConfig) consumeNewLogData() {
 	log.Printf("consuming new log metric data\n")
 	// Iterate over all the counters and update them with the data
 	for name, counter := range a.LogMetrics {
-		a.LMData.AddCounter(name, counter)
+		a.LMData.AddCounter(name, counter, a.NamesByAddr)
 	}
 	// We have updated the prometheus counters, reset the counters in the
 	// data structure. We do so because these are counters so we are always

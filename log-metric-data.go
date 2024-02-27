@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"net/netip"
 	"strings"
 	"sync"
 
@@ -125,13 +126,37 @@ func (m *LogMetricData) Update(cc *ConnectionCounts, tt TrafficType) {
 	m.data[le] += cc.RxBytes
 }
 
+func toNetIp(addrString string) (*netip.Addr, error) {
+	addr, err := netip.ParseAddr(addrString)
+	if err != nil {
+		return nil, err
+	}
+	return &addr, nil
+}
+
 // Given a metric name and the actual metric,
 // add the latest values collected to the metric
-func (m *LogMetricData) AddCounter(metricName string, cv *prometheus.CounterVec) {
+func (m *LogMetricData) AddCounter(metricName string, cv *prometheus.CounterVec, namesByAddr map[netip.Addr]string) {
 	add := func(le LogEntry, value uint64) {
+		s := le.Src
+		d := le.Dst
+		if namesByAddr != nil {
+			sNetIp, err := toNetIp(s)
+			if err == nil {
+				if h, ok := namesByAddr[*sNetIp]; ok {
+					s = h
+				}
+			}
+			dNetIp, err := toNetIp(d)
+			if err == nil {
+				if h, ok := namesByAddr[*dNetIp]; ok {
+					d = h
+				}
+			}
+		}
 		cv.WithLabelValues(
-			le.Src,
-			le.Dst,
+			s,
+			d,
 			le.TrafficType.String(),
 			fmt.Sprintf("%d", le.Proto)).Add(float64(value))
 	}
