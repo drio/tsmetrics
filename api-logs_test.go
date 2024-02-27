@@ -68,19 +68,34 @@ func (f *FakeClientLog) Get(url string) (*http.Response, error) {
 	return response, nil
 }
 
+var (
+	app      AppConfig
+	flClient FakeClientLog
+	faClient FakeClientAPI
+)
+
+func TestMain(m *testing.M) {
+	app = AppConfig{
+		APIMetrics:           map[string]*prometheus.GaugeVec{},
+		LogMetrics:           map[string]*prometheus.CounterVec{},
+		SleepIntervalSeconds: *waitTimeSecs,
+		LMData:               &LogMetricData{},
+	}
+
+	flClient = FakeClientLog{}
+	faClient = FakeClientAPI{}
+
+	exitVal := m.Run()
+	os.Exit(exitVal)
+}
+
 func TestAPIMetrics(t *testing.T) {
 	t.Run("metric tailscale_hosts", func(t *testing.T) {
-		app := AppConfig{
-			APIMetrics:           map[string]*prometheus.GaugeVec{},
-			SleepIntervalSeconds: *waitTimeSecs,
-			LMData:               &LogMetricData{},
-		}
 		app.LMData.Init()
 		app.registerAPIMetrics()
 
-		fClient := FakeClientAPI{}
-		fClient.SetDevices(jsonDevices)
-		app.updateAPIMetrics(&fClient)
+		faClient.SetDevices(jsonDevices)
+		app.updateAPIMetrics(&faClient)
 
 		mName := "tailscale_hosts"
 		c := qt.New(t)
@@ -109,24 +124,13 @@ func TestAPIMetrics(t *testing.T) {
 	})
 }
 
-func TestMain(m *testing.M) {
-	exitVal := m.Run()
-	os.Exit(exitVal)
-}
-
 func TestLogMetrics(t *testing.T) {
 	t.Run("We expose the correct counter values after two consecutive calls", func(t *testing.T) {
-		app := AppConfig{
-			LogMetrics:           map[string]*prometheus.CounterVec{},
-			SleepIntervalSeconds: *waitTimeSecs,
-			LMData:               &LogMetricData{},
-		}
 		app.LMData.Init()
 		app.registerLogMetrics()
 
-		fClient := FakeClientLog{}
-		fClient.SetJson(logOne)
-		app.getNewLogData(&fClient)
+		flClient.SetJson(logOne)
+		app.getNewLogData(&flClient)
 		app.consumeNewLogData()
 
 		mName := "tailscale_tx_packets"
@@ -142,38 +146,35 @@ func TestLogMetrics(t *testing.T) {
 
 		// Make a new call to get new counters and check again the metric values
 		// the second log file matches the first one so the values should just double.
-		fClient.SetJson(logTwo)
-		app.getNewLogData(&fClient)
+		flClient.SetJson(logTwo)
+		app.getNewLogData(&flClient)
 		app.consumeNewLogData()
 		val, found = getMetricValueWithSrc(src, mName, t)
 		fmt.Printf("\n%f, %t\n", val, found)
 		c.Assert(found, qt.Equals, true)
 		c.Assert(val, qt.Equals, 800.0)
 
-		// TODO: this test should have its own subtest. I have it here
-		// otherwise I get an error where prometheus tells me I am trying TODO
-		// register metrics twice:
-		// panic: duplicate metrics collector registration attempted
-		// subtest name: Make sure we can resolve names
-		app.LMData.Init()
-
-		fClient.SetJson(jsonDevicesTwo)
-		tailNet := "dummy"
-		app.NamesByAddr = mustMakeNamesByAddr(&tailNet, &fClient)
-
-		fClient.SetJson(logThree)
-		app.getNewLogData(&fClient)
-		app.consumeNewLogData()
-
-		mName = "tailscale_tx_packets"
-		src = "hello"
-		val, found = getMetricValueWithSrc(src, mName, t)
-		fmt.Printf("\n%f, %t\n", val, found)
-		c.Assert(found, qt.Equals, true)
-		c.Assert(val, qt.Equals, 130.0)
 	})
 
 	t.Run("We resolve names", func(t *testing.T) {
+		c := qt.New(t)
+		app.LMData.Init()
+
+		flClient.SetJson(jsonDevicesTwo)
+		tailNet := "dummy"
+		app.NamesByAddr = mustMakeNamesByAddr(&tailNet, &flClient)
+
+		flClient.SetJson(logThree)
+		app.getNewLogData(&flClient)
+		app.consumeNewLogData()
+
+		mName := "tailscale_tx_packets"
+		src := "hello"
+		val, found := getMetricValueWithSrc(src, mName, t)
+		fmt.Printf("\n%f, %t\n", val, found)
+		c.Assert(found, qt.Equals, true)
+		c.Assert(val, qt.Equals, 130.0)
+
 	})
 }
 
