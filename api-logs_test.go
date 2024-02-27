@@ -19,8 +19,6 @@ import (
 var (
 	//go:embed testdata/devices.json
 	jsonDevices []byte
-	//go:embed testdata/empty_devices.json
-	emptyDevices []byte
 	//go:embed testdata/logs.one.json
 	logOne []byte
 	//go:embed testdata/logs.two.json
@@ -95,7 +93,10 @@ func (f *FakeClientLog) SetJson(jsonD []byte) {
 
 func (f *FakeClientLog) Get(url string) (*http.Response, error) {
 	recorder := httptest.NewRecorder()
-	recorder.Write(f.JsonData)
+	_, err := recorder.Write(f.JsonData)
+	if err != nil {
+		return nil, err
+	}
 	recorder.Header().Set("Content-Type", "application/json")
 	response := recorder.Result()
 	return response, nil

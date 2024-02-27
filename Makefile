@@ -1,6 +1,12 @@
 PRJ=tsmetrics
 BINS=$(PRJ).linux.amd64 $(PRJ).darwin.arm64 $(PRJ).windows.amd64
 
+.PHONY: checks vuln
+checks: lint vuln
+
+vuln:
+	govulncheck ./...
+
 test:
 	go test -v *.go
 
@@ -10,6 +16,9 @@ test/watch:
 coverage/html:
 	go test -v -cover -coverprofile=c.out
 	go tool cover -html=c.out
+
+run/local:
+	@bash -c 'set -a; source <(cat .env | sed "s/#.*//g" | xargs); set +a && go run . --regularServer'
 
 build: $(BINS)
 
@@ -34,3 +43,8 @@ module:
 .PHONY: lint
 lint:
 	golangci-lint run
+
+.PHONY: deps
+deps:
+	brew install golangci-lint
+	go install golang.org/x/vuln/cmd/govulncheck@latest
