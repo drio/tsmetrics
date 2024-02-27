@@ -21,7 +21,7 @@ coverage/html:
 run:
 	@bash -c 'set -a; source <(cat .env | \
 		sed "s/#.*//g" | xargs); \
-		set +a && go run . --addr=:9100 --resolve-names'
+		set +a && go run . --tsnet-verbose --addr=:9100 --resolve-names'
 
 .PHONY: run/local
 run/local:

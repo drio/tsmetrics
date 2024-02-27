@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"net"
 	"net/http"
 	"net/netip"
 	"os"
@@ -35,6 +34,7 @@ var (
 	regularServer = flag.Bool("regular-server", false, "use to create a normal http server")
 	waitTimeSecs  = flag.Int("wait-secs", 45, "waiting time after getting new data")
 	resolveNames  = flag.Bool("resolve-names", false, "convert tailscale IP addresses to hostnames")
+	tsnetVerbose  = flag.Bool("tsnet-verbose", false, "if set, verbosely log tsnet information")
 )
 
 type AppConfig struct {
@@ -74,27 +74,10 @@ func main() {
 		log.Fatal("Please, provide a TAILNET_NAME option")
 	}
 
-	var s *tsnet.Server
-	var ln net.Listener
-
-	if !*regularServer {
-		log.Printf("using tsnet")
-		s = new(tsnet.Server)
-		s.Hostname = *hostname
-		defer s.Close()
-
-		ln, err := s.Listen("tcp", *addr)
-		if err != nil {
-			log.Fatal(err)
-		}
-		defer ln.Close()
-	}
-
 	app := AppConfig{
 		TailNetName:          tailnetName,
 		ClientId:             clientId,
 		ClientSecret:         clientSecret,
-		Server:               s,
 		LogMetrics:           map[string]*prometheus.CounterVec{},
 		APIMetrics:           map[string]*prometheus.GaugeVec{},
 		SleepIntervalSeconds: *waitTimeSecs,
@@ -121,10 +104,22 @@ func main() {
 			panic(err)
 		}
 	} else {
-		log.Printf("starting server on %s", *addr)
+		log.Printf("listening in the tailnet")
+		s := new(tsnet.Server)
+		s.Hostname = *hostname
+		s.Logf = log.New(os.Stderr, fmt.Sprintf("[tsnet:%s] ", *hostname), log.LstdFlags).Printf
+		defer s.Close()
+
+		ln, err := s.Listen("tcp", *addr)
+		if err != nil {
+			log.Fatal(err)
+		}
 		if ln == nil {
 			log.Fatal("ln is nil")
 		}
+		defer ln.Close()
+
+		log.Printf("starting server on %s", *addr)
 		log.Fatal(http.Serve(ln, nil))
 	}
 }
