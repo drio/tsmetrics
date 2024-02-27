@@ -34,7 +34,6 @@ var (
 	regularServer = flag.Bool("regular-server", false, "use to create a normal http server")
 	waitTimeSecs  = flag.Int("wait-secs", 45, "waiting time after getting new data")
 	resolveNames  = flag.Bool("resolve-names", false, "convert tailscale IP addresses to hostnames")
-	tsnetVerbose  = flag.Bool("tsnet-verbose", false, "if set, verbosely log tsnet information")
 )
 
 type AppConfig struct {

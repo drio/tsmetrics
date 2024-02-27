@@ -2,7 +2,7 @@ PRJ=tsmetrics
 BINS=$(PRJ).linux.amd64 $(PRJ).darwin.arm64 $(PRJ).windows.amd64
 
 .PHONY: checks vuln
-checks: lint vuln
+checks: lint vuln test
 
 vuln:
 	govulncheck ./...
@@ -21,7 +21,7 @@ coverage/html:
 run:
 	@bash -c 'set -a; source <(cat .env | \
 		sed "s/#.*//g" | xargs); \
-		set +a && go run . --wait-secs=300 --tsnet-verbose --addr=:9100 --resolve-names'
+		set +a && go run . --wait-secs=240 --tsnet-verbose --addr=:9100 --resolve-names'
 
 .PHONY: run/local
 run/local:
