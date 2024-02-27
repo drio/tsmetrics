@@ -144,6 +144,7 @@ func (m *LogMetricData) AddCounter(metricName string, cv *prometheus.CounterVec,
 			sNetIp, err := toNetIp(s)
 			if err == nil {
 				if h, ok := namesByAddr[*sNetIp]; ok {
+					fmt.Printf("xxx>> [%s] %t\n", h, ok)
 					s = h
 				}
 			}

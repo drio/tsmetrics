@@ -153,7 +153,7 @@ func TestLogMetrics(t *testing.T) {
 	// 	c.Assert(val, qt.Equals, 800.0)
 	// })
 
-	t.Run("We resolve ips", func(t *testing.T) {
+	t.Run("We resolve ips to hostnames", func(t *testing.T) {
 		app := AppConfig{
 			LogMetrics:           map[string]*prometheus.CounterVec{},
 			SleepIntervalSeconds: *waitTimeSecs,
@@ -178,7 +178,7 @@ func TestLogMetrics(t *testing.T) {
 		srcToMetric := gatherLabels("src", mName, t)
 		c.Assert(len(srcToMetric), qt.Equals, 1)
 
-		src := "100.111.22.33"
+		src := "hello"
 		val, found := getMetricValueWithSrc(src, mName, t)
 		fmt.Printf("\n%f, %t\n", val, found)
 		c.Assert(found, qt.Equals, true)
@@ -198,7 +198,7 @@ func getMetricValueWithSrc(src, mName string, t *testing.T) (float64, bool) {
 			for _, metric := range mf.GetMetric() {
 				//fmt.Printf("\n %s %f %v\n", *mf.Name, metric.Counter.GetValue(), srcLabels[src])
 				for _, label := range metric.GetLabel() {
-					fmt.Printf("%s %s %s \n", *mf.Name, label.GetName(), label.GetValue())
+					//fmt.Printf("%s %s %s \n", *mf.Name, label.GetName(), label.GetValue())
 					if label.GetName() == "src" && label.GetValue() == src {
 						return metric.Counter.GetValue(), true
 					}
