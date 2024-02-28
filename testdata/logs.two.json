@@ -11,18 +11,18 @@
           "src": "100.111.22.33:21291",
           "dst": "100.111.44.55:63281",
           "txPkts": 10,
-          "txBytes": 1,
           "rxPkts": 200,
-          "rxBytes": 201
+          "txBytes": 1,
+          "rxBytes": 100
         },
         {
           "proto": 6,
           "src": "100.111.22.33:21291",
           "dst": "100.111.44.55:63280",
           "txPkts": 30,
-          "txBytes": 1,
           "rxPkts": 400,
-          "rxBytes": 401
+          "txBytes": 1,
+          "rxBytes": 100
         }
       ],
       "physicalTraffic": [

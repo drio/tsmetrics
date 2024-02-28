@@ -166,6 +166,21 @@ func TestTxPackets(t *testing.T) {
 	fmt.Printf("\n%f, %t\n", val, found)
 	c.Assert(found, qt.Equals, true)
 	c.Assert(val, qt.Equals, 80.0)
+
+	mName = "tailscale_rx_packets"
+	val, found = getMetricValueWithSrc(src, mName, t)
+	c.Assert(found, qt.Equals, true)
+	c.Assert(val, qt.Equals, 622.0)
+
+	mName = "tailscale_tx_bytes"
+	val, found = getMetricValueWithSrc(src, mName, t)
+	c.Assert(found, qt.Equals, true)
+	c.Assert(val, qt.Equals, 5.0)
+
+	mName = "tailscale_rx_bytes"
+	val, found = getMetricValueWithSrc(src, mName, t)
+	c.Assert(found, qt.Equals, true)
+	c.Assert(val, qt.Equals, 260.0)
 }
 
 func TestResolveNames(t *testing.T) {
