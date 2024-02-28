@@ -171,7 +171,7 @@ func (m *LogMetricData) AddCounter(metricName string, cv *prometheus.CounterVec,
 		if strings.Contains(metricName, "tx_packets") && le.CountType == "TxPackets" {
 			add(le, value)
 		}
-		if strings.Contains(metricName, "rx_packets") && le.CountType == "TxPackets" {
+		if strings.Contains(metricName, "rx_packets") && le.CountType == "RxPackets" {
 			add(le, value)
 		}
 	}

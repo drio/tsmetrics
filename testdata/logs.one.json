@@ -10,19 +10,19 @@
           "proto": 6,
           "src": "100.111.22.33:21291",
           "dst": "100.111.44.55:63281",
-          "txPkts": 100,
-          "txBytes": 101,
-          "rxPkts": 200,
-          "rxBytes": 20100
+          "txPkts": 10,
+          "rxPkts": 2,
+          "txBytes": 1,
+          "rxBytes": 0
         },
         {
           "proto": 6,
           "src": "100.111.22.33:21291",
           "dst": "100.111.44.55:63280",
-          "txPkts": 300,
-          "txBytes": 301,
+          "txPkts": 30,
           "rxPkts": 400,
-          "rxBytes": 401
+          "txBytes": 2,
+          "rxBytes": 0
         }
       ],
       "physicalTraffic": [

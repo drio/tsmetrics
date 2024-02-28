@@ -81,6 +81,9 @@ func TestMain(m *testing.M) {
 		SleepIntervalSeconds: *waitTimeSecs,
 		LMData:               &LogMetricData{},
 	}
+	app.LMData.Init()
+	app.registerLogMetrics()
+	app.registerAPIMetrics()
 
 	flClient = FakeClientLog{}
 	faClient = FakeClientAPI{}
@@ -92,7 +95,6 @@ func TestMain(m *testing.M) {
 func TestAPIMetrics(t *testing.T) {
 	t.Run("metric tailscale_hosts", func(t *testing.T) {
 		app.LMData.Init()
-		app.registerAPIMetrics()
 
 		faClient.SetDevices(jsonDevices)
 		app.updateAPIMetrics(&faClient)
@@ -125,9 +127,8 @@ func TestAPIMetrics(t *testing.T) {
 }
 
 func TestLogMetrics(t *testing.T) {
-	t.Run("We expose the correct counter values after two consecutive calls", func(t *testing.T) {
+	t.Run("tailscale_tx_packets", func(t *testing.T) {
 		app.LMData.Init()
-		app.registerLogMetrics()
 
 		flClient.SetJson(logOne)
 		app.getNewLogData(&flClient)
@@ -142,7 +143,7 @@ func TestLogMetrics(t *testing.T) {
 		val, found := getMetricValueWithSrc(src, mName, t)
 		fmt.Printf("\n%f, %t\n", val, found)
 		c.Assert(found, qt.Equals, true)
-		c.Assert(val, qt.Equals, 400.0)
+		c.Assert(val, qt.Equals, 40.0)
 
 		// Make a new call to get new counters and check again the metric values
 		// the second log file matches the first one so the values should just double.
@@ -152,8 +153,7 @@ func TestLogMetrics(t *testing.T) {
 		val, found = getMetricValueWithSrc(src, mName, t)
 		fmt.Printf("\n%f, %t\n", val, found)
 		c.Assert(found, qt.Equals, true)
-		c.Assert(val, qt.Equals, 800.0)
-
+		c.Assert(val, qt.Equals, 80.0)
 	})
 
 	t.Run("We resolve names", func(t *testing.T) {
@@ -174,7 +174,6 @@ func TestLogMetrics(t *testing.T) {
 		fmt.Printf("\n%f, %t\n", val, found)
 		c.Assert(found, qt.Equals, true)
 		c.Assert(val, qt.Equals, 130.0)
-
 	})
 }
 
