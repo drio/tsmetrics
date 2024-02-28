@@ -123,7 +123,7 @@ func TestAPIMetrics(t *testing.T) {
 	c.Assert(foo["client_version"], qt.Equals, "2.2.2")
 }
 
-func TestTxPackets(t *testing.T) {
+func TestLogMetrics(t *testing.T) {
 	app.LMData.Init()
 
 	flClient.SetJson(logOne)
