@@ -136,51 +136,43 @@ func TestLogMetrics(t *testing.T) {
 	c.Assert(len(srcToMetric), qt.Equals, 3)
 
 	src := "100.111.22.33"
-	val, found := getMetricValueWithSrc(src, mName, t)
-	fmt.Printf("\n%f, %t\n", val, found)
-	c.Assert(found, qt.Equals, true)
-	c.Assert(val, qt.Equals, 40.0)
+
+	checkValues(src, mName, t, 40.0)
 
 	mName = "tailscale_rx_packets"
-	val, found = getMetricValueWithSrc(src, mName, t)
-	c.Assert(found, qt.Equals, true)
-	c.Assert(val, qt.Equals, 22.0)
+	checkValues(src, mName, t, 22.0)
 
 	mName = "tailscale_tx_bytes"
-	val, found = getMetricValueWithSrc(src, mName, t)
-	c.Assert(found, qt.Equals, true)
-	c.Assert(val, qt.Equals, 3.0)
+	checkValues(src, mName, t, 3.0)
 
 	mName = "tailscale_rx_bytes"
-	val, found = getMetricValueWithSrc(src, mName, t)
-	c.Assert(found, qt.Equals, true)
-	c.Assert(val, qt.Equals, 60.0)
+	checkValues(src, mName, t, 60.0)
 
 	// Make a new call to get new counters and check again the metric values
 	// the second log file matches the first one so the values should just double.
-	mName = "tailscale_tx_packets"
 	flClient.SetJson(logTwo)
 	app.getNewLogData(&flClient)
 	app.consumeNewLogData()
-	val, found = getMetricValueWithSrc(src, mName, t)
-	fmt.Printf("\n%f, %t\n", val, found)
-	c.Assert(found, qt.Equals, true)
-	c.Assert(val, qt.Equals, 80.0)
+
+	mName = "tailscale_tx_packets"
+	checkValues(src, mName, t, 80.0)
 
 	mName = "tailscale_rx_packets"
-	val, found = getMetricValueWithSrc(src, mName, t)
-	c.Assert(found, qt.Equals, true)
-	c.Assert(val, qt.Equals, 622.0)
+	checkValues(src, mName, t, 622.0)
 
 	mName = "tailscale_tx_bytes"
-	val, found = getMetricValueWithSrc(src, mName, t)
-	c.Assert(found, qt.Equals, true)
-	c.Assert(val, qt.Equals, 5.0)
+	checkValues(src, mName, t, 5.0)
 
 	mName = "tailscale_rx_bytes"
-	val, found = getMetricValueWithSrc(src, mName, t)
+	checkValues(src, mName, t, 260.0)
+}
+
+func checkValues(src, mName string, t *testing.T, expected float64) {
+	c := qt.New(t)
+	val, found := getMetricValueWithSrc(src, mName, t)
+	fmt.Printf("\n%f, %t\n", val, found)
 	c.Assert(found, qt.Equals, true)
-	c.Assert(val, qt.Equals, 260.0)
+	c.Assert(val, qt.Equals, expected)
 }
 
 func TestResolveNames(t *testing.T) {
