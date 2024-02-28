@@ -13,16 +13,16 @@
           "txPkts": 10,
           "rxPkts": 2,
           "txBytes": 1,
-          "rxBytes": 0
+          "rxBytes": 50
         },
         {
           "proto": 6,
           "src": "100.111.22.33:21291",
           "dst": "100.111.44.55:63280",
           "txPkts": 30,
-          "rxPkts": 400,
+          "rxPkts": 20,
           "txBytes": 2,
-          "rxBytes": 0
+          "rxBytes": 10
         }
       ],
       "physicalTraffic": [
