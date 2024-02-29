@@ -25,7 +25,8 @@ $ go run . --wait-secs=240 --tsnet-verbose --addr=:9100 --resolve-names
 ```
 
 That runs tsmetrics as a service in your tailnet (you can run it outside your tailnet with: `--regular-server`). 
-The tool gets log and API data every 240 secs and updates
+You will see tailscale requesting a login. Alternatively you can provide an auth key by setting the `TS_AUTHKEY` 
+env var. The tool gets log and API data every 240 secs and updates
 a few prometheus metrics (we will add more metrics in the future):
 
 ```txt
