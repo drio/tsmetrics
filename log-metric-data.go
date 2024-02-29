@@ -6,7 +6,6 @@ import (
 	"net"
 	"net/netip"
 	"strings"
-	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -65,13 +64,10 @@ func (l *LogEntry) String() string {
 type MapLogEntryToValue map[LogEntry]uint64
 
 type LogMetricData struct {
-	mu   sync.RWMutex
 	data MapLogEntryToValue
 }
 
 func (m *LogMetricData) Init() {
-	m.mu.Lock()
-	defer m.mu.Unlock()
 	m.data = make(MapLogEntryToValue)
 }
 
@@ -106,9 +102,6 @@ func (m *LogMetricData) SaveNewData(apiResponse APILogResponse) {
 
 // Update based on the data from a new log entry (counts)
 func (m *LogMetricData) Update(cc *ConnectionCounts, tt TrafficType) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
 	le := LogEntry{
 		hostOnly(cc.Src),
 		hostOnly(cc.Dst),
