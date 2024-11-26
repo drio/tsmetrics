@@ -13,15 +13,15 @@ Install the latest [golang](https://go.dev/doc/install) and clone the repo.
 You need to create an [oauth client](https://tailscale.com/kb/1215/oauth-clients#scopes) with the `devices:read, network-logs:read`
 scopes in your tailnet. Set those as env variables:
 
-```
+```sh
 $ cat .env
 OAUTH_CLIENT_ID=XXXXX
 OAUTH_CLIENT_SECRET=YYYY
 TAILNET_NAME=my_tailnet
-```
 
-```sh
-$ go run . --wait-secs=240 --tsnet-verbose --addr=:9100 --resolve-names
+$ bash -c 'set -a; source <(cat .env | \
+        sed "s/#.*//g" | xargs); \
+        set +a && go run . --wait-secs=240 --tsnet-verbose --addr=:9100 --resolve-names'
 ```
 
 That runs tsmetrics as a service in your tailnet (you can run it outside your tailnet with: `--regular-server`). 
