@@ -99,7 +99,7 @@ func main() {
 
 	if *regularServer {
 		log.Printf("starting regular server on %s", *addr)
-		if err := http.ListenAndServe(":9100", nil); err != nil {
+		if err := http.ListenAndServe(*addr, nil); err != nil {
 			panic(err)
 		}
 	} else {

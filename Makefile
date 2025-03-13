@@ -57,3 +57,10 @@ lint:
 deps:
 	brew install golangci-lint
 	go install golang.org/x/vuln/cmd/govulncheck@latest
+
+update:
+	go get -u ./...
+	go mod tidy
+
+rsync:
+	rsync -avz -e ssh --progress --exclude=tsmetrics/tsmetrics ../tsmetrics prom-graf:services/tsmetrics 
