@@ -63,4 +63,4 @@ update:
 	go mod tidy
 
 rsync:
-	rsync -avz -e ssh --progress --exclude=tsmetrics/tsmetrics ../tsmetrics prom-graf:services/tsmetrics 
+	rsync -avz -e ssh --progress --exclude=tsmetrics/tsmetrics ../tsmetrics prom-graf:services/
